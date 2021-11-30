@@ -28,7 +28,7 @@ There are lots of reasons to use GradAttack:
 For help and realtime updates related to GradAttack, please join [the GradAttack Slack](https://join.slack.com/t/gradattack/shared_invite/zt-yrbi6lf9-VRrzQcJUeGf185xDr4J~4A)!
 
 
-## Installation (TBD)
+## Installation
 
 You may install GradAttack directly from PyPi using `pip`:
 
