@@ -1,6 +1,6 @@
 ![GradAttack](assets/GradAttack_logo.gif)
 
-[![Python Package using Conda](https://github.com/Princeton-SysML/GradAttack/actions/workflows/python-test.yml/badge.svg)](https://github.com/Princeton-SysML/GradAttack/actions/workflows/python-test.yml)
+[![GradAttack CI](https://github.com/Princeton-SysML/GradAttack/actions/workflows/python-test.yml/badge.svg)](https://github.com/Princeton-SysML/GradAttack/actions/workflows/python-test.yml)
 
 GradAttack is a Python library for easy evaluation of privacy risks in public gradients in Federated Learning, as well as corresponding mitigation strategies. The current version focuses on the gradient inversion attack in the image classification task, which recovers *private* images from *public* gradients. 
 
