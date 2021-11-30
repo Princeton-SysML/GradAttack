@@ -1,0 +1,18 @@
+# Cache files
+*.pyc
+.vscode/
+*.sh
+
+# Checkpoint folders
+checkpoint/
+
+# Data folders
+data/
+
+# Results folders
+decode/
+tb_logs/
+results*
+
+# Doc folders
+gradattack/docs/
