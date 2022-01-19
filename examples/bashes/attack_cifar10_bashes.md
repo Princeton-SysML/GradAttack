@@ -10,7 +10,7 @@ Here we provide example scripts for attacking a CIFAR-10 training pipeline under
 In a realistic Federated Learning setup, the attacker does **not** know private BatchNorm statistics or private labels of the victim batch. The script below runs the attack in such a setting. 
 
 ```
-python3 run_attack_cifar10.py --batch_size 16 --tv 0.05 --bn_reg 0.001 --reconstruct_labels
+python3 examples/attack_cifar10_gradinversion.py --batch_size 16 --tv 0.05 --bn_reg 0.001 --reconstruct_labels
 ```
 
 where `reconstruct_labels` asserts that attacker needs to reconstruct private labels when running the inversion attack; `tv` (coef. for total variation) and `bn_reg` (coef. for BatchNorm regularizer) are tuneable hyper-parameters. 
