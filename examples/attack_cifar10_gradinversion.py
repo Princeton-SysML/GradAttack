@@ -26,10 +26,11 @@ def setup_attack():
     args, hparams, attack_hparams = parse_args()
     print(attack_hparams)
 
-    global ROOT_DIR, DEVICE, EPOCH
+    global ROOT_DIR, DEVICE, EPOCH, devices
 
     DEVICE = torch.device(f"cuda:{args.gpuid}")
     EPOCH = attack_hparams["epoch"]
+    devices = [args.gpuid]
 
     pl.utilities.seed.seed_everything(1234 + EPOCH)
     torch.backends.cudnn.benchmark = True
@@ -83,7 +84,7 @@ def setup_attack():
             **hparams).to(DEVICE)
 
     logger = TensorBoardLogger("tb_logs", name=f"{args.logname}")
-    trainer = pl.Trainer(benchmark=True, logger=logger)
+    trainer = pl.Trainer(gpus=devices, benchmark=True, logger=logger)
     pipeline = TrainingPipeline(model, datamodule, trainer)
 
     defense_pack = DefensePack(args, logger)
@@ -178,6 +179,7 @@ def run_attack(pipeline, attack_hparams):
 
         tb_logger = TensorBoardLogger(BATCH_ROOT_DIR, name="tb_log")
         attack_trainer = pl.Trainer(
+            gpus=devices,
             logger=tb_logger,
             max_epochs=1,
             benchmark=True,
