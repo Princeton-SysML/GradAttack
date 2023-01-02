@@ -370,6 +370,9 @@ class CIFAR10DataModule(BaseDataModule):
     def init_transform(self):
         return [transforms.ToTensor(), DATASET_NORM[self.DATASET_NAME]]
 
+    def base_dataset(self, root, **kwargs):
+        return CIFAR10(root, **kwargs)
+
     @property
     def num_classes(self):
         return 10
@@ -388,13 +391,11 @@ class CIFAR10DataModule(BaseDataModule):
             stage (Optional[str], optional): stage option. Defaults to None.
         """
         if stage == "fit" or stage is None:
-            self.train_set = CIFAR10(
-                self.data_dir,
-                train=True,
-                transform=transforms.Compose(self._train_transforms),
-            )
+            self.train_set = self.base_dataset(self.data_dir,
+                                               train=True,
+                                               transform=transforms.Compose(self._train_transforms))
             if self.tune_on_val:
-                self.val_set = CIFAR10(
+                self.val_set = self.base_dataset(
                     self.data_dir,
                     train=True,
                     transform=transforms.Compose(self._test_transforms),
@@ -404,7 +405,7 @@ class CIFAR10DataModule(BaseDataModule):
                 self.train_set = Subset(self.train_set, train_indices)
                 self.val_set = Subset(self.val_set, val_indices)
             else:
-                self.val_set = CIFAR10(
+                self.val_set = self.base_dataset(
                     self.data_dir,
                     train=False,
                     transform=transforms.Compose(self._test_transforms),
@@ -412,14 +413,14 @@ class CIFAR10DataModule(BaseDataModule):
 
         # Assign test dataset for use in dataloader(s)
         if stage == "test" or stage is None:
-            self.test_set = CIFAR10(
+            self.test_set = self.base_dataset(
                 self.data_dir,
                 train=False,
                 transform=transforms.Compose(self._test_transforms),
             )
 
         if stage == "attack":
-            ori_train_set = CIFAR10(
+            ori_train_set = self.base_dataset(
                 self.data_dir,
                 train=True,
                 transform=transforms.Compose(self._train_transforms),
@@ -429,7 +430,7 @@ class CIFAR10DataModule(BaseDataModule):
             self.train_set = Subset(ori_train_set, self.attack_indices)
             self.test_set = Subset(self.test_set, range(100))
         elif stage == "attack_mini":
-            ori_train_set = CIFAR10(
+            ori_train_set = self.base_dataset(
                 self.data_dir,
                 train=True,
                 transform=transforms.Compose(self._train_transforms),
@@ -439,7 +440,7 @@ class CIFAR10DataModule(BaseDataModule):
             self.train_set = Subset(ori_train_set, self.attack_indices)
             self.test_set = Subset(self.test_set, range(100))
         elif stage == "attack_large":
-            ori_train_set = CIFAR10(
+            ori_train_set = self.base_dataset(
                 self.data_dir,
                 train=True,
                 transform=transforms.Compose(self._train_transforms),
@@ -459,3 +460,6 @@ class CIFAR100DataModule(CIFAR10DataModule):
     def prepare_data(self):
         """Download the data"""
         CIFAR100(self.data_dir, download=True)
+
+    def base_dataset(self, root, **kwargs):
+        return CIFAR100(root, **kwargs)
