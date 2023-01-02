@@ -1,14 +1,9 @@
-# FIXME: @Samyak, could you please help add docstring to this file? Thanks!
 import os
-import time
-from typing import Any, Callable, Optional
+from typing import Callable
 
 import pytorch_lightning as pl
-import torch.nn.functional as F
-import torchvision.models as models
 from gradattack.utils import StandardizeLayer
 from sklearn import metrics
-from torch.nn import init
 from torch.optim.lr_scheduler import LambdaLR, MultiStepLR, ReduceLROnPlateau, StepLR
 
 from .covidmodel import *
@@ -38,23 +33,24 @@ class StepTracker:
 
 class LightningWrapper(pl.LightningModule):
     """Wraps a torch module in a pytorch-lightning module. Any ."""
+
     def __init__(
-        self,
-        model: torch.nn.Module,
-        training_loss_metric: Callable = F.mse_loss,
-        optimizer: str = "SGD",
-        lr_scheduler: str = "ReduceLROnPlateau",
-        tune_on_val: float = 0.02,
-        lr_factor: float = 0.5,
-        lr_step: int = 10,
-        batch_size: int = 64,
-        lr: float = 0.05,
-        momentum: float = 0.9,
-        weight_decay: float = 5e-4,
-        nesterov: bool = False,
-        log_auc: bool = False,
-        multi_class: bool = False,
-        multi_head: bool = False,
+            self,
+            model: torch.nn.Module,
+            training_loss_metric: Callable = F.mse_loss,
+            optimizer: str = "SGD",
+            lr_scheduler: str = "ReduceLROnPlateau",
+            tune_on_val: float = 0.02,
+            lr_factor: float = 0.5,
+            lr_step: int = 10,
+            batch_size: int = 64,
+            lr: float = 0.05,
+            momentum: float = 0.9,
+            weight_decay: float = 5e-4,
+            nesterov: bool = False,
+            log_auc: bool = False,
+            multi_class: bool = False,
+            multi_head: bool = False,
     ):
         super().__init__()
         # if we didn't copy here, then we would modify the default dict by accident
@@ -185,17 +181,17 @@ class LightningWrapper(pl.LightningModule):
         return training_step_results
 
     def get_batch_gradients(
-        self,
-        batch: torch.tensor,
-        batch_idx: int = 0,
-        create_graph: bool = False,
-        clone_gradients: bool = True,
-        apply_transforms=True,
-        eval_mode: bool = False,
-        stop_track_bn_stats: bool = True,
-        BN_exact: bool = False,
-        attacker: bool = False,
-        *args,
+            self,
+            batch: torch.tensor,
+            batch_idx: int = 0,
+            create_graph: bool = False,
+            clone_gradients: bool = True,
+            apply_transforms=True,
+            eval_mode: bool = False,
+            stop_track_bn_stats: bool = True,
+            BN_exact: bool = False,
+            attacker: bool = False,
+            *args,
     ):
         batch = tuple(k.to(self.device) for k in batch)
         if eval_mode is True:
@@ -317,7 +313,7 @@ class LightningWrapper(pl.LightningModule):
         elif self.hparams["lr_scheduler"] == "LambdaLR":
             self.lr_scheduler = LambdaLR(
                 self.optimizer,
-                lr_lambda=[lambda epoch: self.hparams["lr_lambda"]**epoch],
+                lr_lambda=[lambda epoch: self.hparams["lr_lambda"] ** epoch],
                 verbose=True,
             )
         elif self.hparams["lr_scheduler"] == "ReduceLROnPlateau":
@@ -465,13 +461,13 @@ class LightningWrapper(pl.LightningModule):
 
 
 def create_lightning_module(
-    model_name: str,
-    num_classes: int,
-    pretrained: bool = False,
-    ckpt: str = None,
-    freeze_extractor: bool = False,
-    *args,
-    **kwargs,
+        model_name: str,
+        num_classes: int,
+        pretrained: bool = False,
+        ckpt: str = None,
+        freeze_extractor: bool = False,
+        *args,
+        **kwargs,
 ) -> LightningWrapper:
     if "models" in model_name:  # Official models by PyTorch
         model_name = model_name.replace("models.", "")
@@ -524,12 +520,12 @@ def do_freeze_extractor(model):
 def multihead_accuracy(output, target):
     prec1 = []
     for j in range(output.size(1)):
-        acc = accuracy(output[:, j], target[:, j], topk=(1, ))
+        acc = accuracy(output[:, j], target[:, j], topk=(1,))
         prec1.append(acc[0])
     return torch.mean(torch.Tensor(prec1))
 
 
-def accuracy(output, target, topk=(1, ), multi_head=False):
+def accuracy(output, target, topk=(1,), multi_head=False):
     """Computes the precision@k for the specified values of k"""
     with torch.no_grad():
         maxk = max(topk)

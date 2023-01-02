@@ -10,7 +10,7 @@ from torch.utils.data import Subset
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
 from torch.utils.data.sampler import Sampler
-from torchvision.datasets.cifar import CIFAR10
+from torchvision.datasets.cifar import CIFAR10, CIFAR100
 from torchvision.datasets import MNIST
 
 DEFAULT_DATA_DIR = "./data"
@@ -22,6 +22,15 @@ TRANSFORM_IMAGENET = [
     transforms.ToTensor(),
     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
 ]
+DATASET_NORM = {
+    'mnist': transforms.Normalize((0.1307,), (0.3081,)),
+    'imagenet': transforms.Normalize((0.485, 0.456, 0.406),
+                                     (0.229, 0.224, 0.225)),
+    'cifar100': transforms.Normalize((0.50705882, 0.48666667, 0.44078431),
+                                     (0.26745098, 0.25647059, 0.27607843)),
+    'cifar10': transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                    (0.2023, 0.1994, 0.2010))
+}
 
 
 def train_val_split(dataset_size: int, val_train_split: float = 0.02):
@@ -35,11 +44,11 @@ def train_val_split(dataset_size: int, val_train_split: float = 0.02):
 
 
 def extract_attack_set(
-    dataset: Dataset,
-    sample_per_class: int = 5,
-    multi_class=False,
-    total_num_samples: int = 50,
-    seed: int = None,
+        dataset: Dataset,
+        sample_per_class: int = 5,
+        multi_class=False,
+        total_num_samples: int = 50,
+        seed: int = None,
 ):
     if not multi_class:
         num_classes = len(dataset.classes)
@@ -66,12 +75,12 @@ def extract_attack_set(
 
 class FileDataModule(LightningDataModule):
     def __init__(
-        self,
-        data_dir: str = DEFAULT_DATA_DIR,
-        transform: torch.nn.Module = transforms.Compose(TRANSFORM_IMAGENET),
-        batch_size: int = 32,
-        num_workers: int = DEFAULT_NUM_WORKERS,
-        batch_sampler: Sampler = None,
+            self,
+            data_dir: str = DEFAULT_DATA_DIR,
+            transform: torch.nn.Module = transforms.Compose(TRANSFORM_IMAGENET),
+            batch_size: int = 32,
+            num_workers: int = DEFAULT_NUM_WORKERS,
+            batch_sampler: Sampler = None,
     ):
         self.data_dir = data_dir
         self.batch_size = batch_size
@@ -98,13 +107,13 @@ class FileDataModule(LightningDataModule):
 
 class ImageNetDataModule(LightningDataModule):
     def __init__(
-        self,
-        augment: dict = None,
-        data_dir: str = os.path.join(DEFAULT_DATA_DIR, "imagenet"),
-        batch_size: int = 32,
-        num_workers: int = DEFAULT_NUM_WORKERS,
-        batch_sampler: Sampler = None,
-        tune_on_val: bool = False,
+            self,
+            augment: dict = None,
+            data_dir: str = os.path.join(DEFAULT_DATA_DIR, "imagenet"),
+            batch_size: int = 32,
+            num_workers: int = DEFAULT_NUM_WORKERS,
+            batch_sampler: Sampler = None,
+            tune_on_val: bool = False,
     ):
         self.data_dir = data_dir
         self.batch_size = batch_size
@@ -223,14 +232,16 @@ class ImageNetDataModule(LightningDataModule):
 
 
 class MNISTDataModule(LightningDataModule):
+    DATASET_NAME = 'mnist'
+
     def __init__(
-        self,
-        augment: dict = None,
-        batch_size: int = 32,
-        data_dir: str = DEFAULT_DATA_DIR,
-        num_workers: int = DEFAULT_NUM_WORKERS,
-        batch_sampler: Sampler = None,
-        tune_on_val: float = 0,
+            self,
+            augment: dict = None,
+            batch_size: int = 32,
+            data_dir: str = DEFAULT_DATA_DIR,
+            num_workers: int = DEFAULT_NUM_WORKERS,
+            batch_sampler: Sampler = None,
+            tune_on_val: float = 0,
     ):
         super().__init__()
         self._has_setup_attack = False
@@ -244,8 +255,7 @@ class MNISTDataModule(LightningDataModule):
         self.batch_sampler = batch_sampler
         self.tune_on_val = tune_on_val
         self.multi_class = False
-
-        mnist_normalize = transforms.Normalize((0.1307, ), (0.3081, ))
+        mnist_normalize = DATASET_NORM[self.DATASET_NAME]
 
         self._train_transforms = [
             transforms.Resize(32),
@@ -387,15 +397,17 @@ class MNISTDataModule(LightningDataModule):
 
 
 class CIFAR10DataModule(LightningDataModule):
+    DATASET_NAME = 'cifar10'
+
     def __init__(
-        self,
-        augment: dict = None,
-        batch_size: int = 32,
-        data_dir: str = DEFAULT_DATA_DIR,
-        num_workers: int = DEFAULT_NUM_WORKERS,
-        batch_sampler: Sampler = None,
-        tune_on_val: float = 0,
-        seed: int = None,
+            self,
+            augment: dict = None,
+            batch_size: int = 32,
+            data_dir: str = DEFAULT_DATA_DIR,
+            num_workers: int = DEFAULT_NUM_WORKERS,
+            batch_sampler: Sampler = None,
+            tune_on_val: float = 0,
+            seed: int = None,
     ):
         super().__init__()
         self._has_setup_attack = False
@@ -410,9 +422,7 @@ class CIFAR10DataModule(LightningDataModule):
         self.tune_on_val = tune_on_val
         self.multi_class = False
         self.seed = seed
-
-        cifar_normalize = transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                               (0.2023, 0.1994, 0.2010))
+        cifar_normalize = DATASET_NORM[self.DATASET_NAME]
 
         self._train_transforms = [transforms.ToTensor(), cifar_normalize]
         if augment["hflip"]:
@@ -538,3 +548,10 @@ class CIFAR10DataModule(LightningDataModule):
         return DataLoader(self.test_set,
                           batch_size=self.batch_size,
                           num_workers=self.num_workers)
+class CIFAR100DataModule(CIFAR10DataModule):
+    DATASET_NAME = 'cifar100'
+
+    def prepare_data(self):
+        """Download the data"""
+        CIFAR100(self.data_dir, train=True, download=True)
+        CIFAR100(self.data_dir, train=False, download=True)

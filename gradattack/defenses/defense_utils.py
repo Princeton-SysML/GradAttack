@@ -1,11 +1,7 @@
-from typing import Any, Dict, Iterable, List, Optional, Union
-
 import torch
-from colorama import Back, Fore, Style, init
-from torch.utils.data.dataset import Dataset
+from colorama import Fore, Style, init
 
 from gradattack.trainingpipeline import TrainingPipeline
-
 from .dpsgd import DPSGDDefense
 from .gradprune import GradPruneDefense
 from .instahide import InstahideDefense

@@ -1,10 +1,10 @@
 import numpy as np
 import torch
+import torchcsprng as csprng
 from torch.distributions.dirichlet import Dirichlet
 from torch.nn.functional import one_hot
 from torch.utils.data.dataset import Dataset
 
-import torchcsprng as csprng
 from gradattack.defenses.defense import GradientDefense
 from gradattack.trainingpipeline import TrainingPipeline
 
@@ -124,10 +124,10 @@ class MixupDefense(GradientDefense):
                 return np.asarray(lams), np.asarray(selects)
 
     def mixup_batch(
-        self,
-        inputs: torch.tensor,
-        lams_b: float,
-        selects_b: np.array,
+            self,
+            inputs: torch.tensor,
+            lams_b: float,
+            selects_b: np.array,
     ):
         """Generate a MixUp batch.
 
