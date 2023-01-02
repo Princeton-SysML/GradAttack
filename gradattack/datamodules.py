@@ -454,12 +454,13 @@ class CIFAR10DataModule(BaseDataModule):
 class CIFAR100DataModule(CIFAR10DataModule):
     DATASET_NAME = 'cifar100'
 
-    def __init__(self):
-        self.num_classes = 100
-
     def prepare_data(self):
         """Download the data"""
         CIFAR100(self.data_dir, download=True)
+
+    @property
+    def num_classes(self):
+        return 100
 
     def base_dataset(self, root, **kwargs):
         return CIFAR100(root, **kwargs)
