@@ -37,10 +37,3 @@ class TrainingPipeline:
     def test(self):
         return self.trainer.test(
             self.model, self.datamodule.test_dataloader())
-
-    # FIXME: @Samyak, are we actually using this funciton?
-    def get_datamodule_batch(self):
-        self.datamodule.setup()
-        trainloader = self.datamodule.train_dataloader()
-        for batch in trainloader:
-            return batch
