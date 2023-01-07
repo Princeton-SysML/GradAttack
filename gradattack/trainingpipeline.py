@@ -4,12 +4,10 @@ from gradattack.models import LightningWrapper
 
 
 class TrainingPipeline:
-    def __init__(
-        self,
-        model: LightningWrapper,
-        datamodule: pl.LightningDataModule,
-        trainer: pl.Trainer,
-    ):
+    def __init__(self,
+                 model: LightningWrapper,
+                 datamodule: pl.LightningDataModule,
+                 trainer: pl.Trainer):
         self.model = model
         self.datamodule = datamodule
         self.trainer = trainer
@@ -19,10 +17,6 @@ class TrainingPipeline:
             []
         )  # Modifications to the model architecture, trainable params ...
         self.datamodule.setup()
-
-    # FIXME: @Samyak, are we actually using this funciton?
-    def log_hparams(self):
-        self.trainer.logger.log_hyperparams(self.model.hparams)
 
     def setup_pipeline(self):
         self.datamodule.prepare_data()
@@ -42,7 +36,7 @@ class TrainingPipeline:
 
     def test(self):
         return self.trainer.test(
-            self.model, test_dataloaders=self.datamodule.test_dataloader())
+            self.model, self.datamodule.test_dataloader())
 
     # FIXME: @Samyak, are we actually using this funciton?
     def get_datamodule_batch(self):
