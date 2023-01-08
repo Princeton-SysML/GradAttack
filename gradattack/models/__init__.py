@@ -1,22 +1,23 @@
 import os
+from pathlib import Path
 from typing import Callable
 
 import pytorch_lightning as pl
-from gradattack.utils import StandardizeLayer
 from sklearn import metrics
 from torch.optim.lr_scheduler import LambdaLR, MultiStepLR, ReduceLROnPlateau, StepLR
 
+from gradattack.utils import StandardizeLayer
+from .LeNet import *
 from .covidmodel import *
 from .densenet import *
 from .googlenet import *
 from .mobilenet import *
+from .multihead_resnet import *
 from .nasnet import *
 from .resnet import *
 from .resnext import *
 from .simple import *
 from .vgg import *
-from .multihead_resnet import *
-from .LeNet import *
 
 
 class StepTracker:
@@ -51,6 +52,7 @@ class LightningWrapper(pl.LightningModule):
             log_auc: bool = False,
             multi_class: bool = False,
             multi_head: bool = False,
+            save_log: str = 'save_ckpts'
     ):
         super().__init__()
         # if we didn't copy here, then we would modify the default dict by accident
@@ -71,6 +73,8 @@ class LightningWrapper(pl.LightningModule):
         self._training_loss_metric = training_loss_metric
         self._val_loss_metric = training_loss_metric
 
+        self._optimizer = optimizer
+
         self._batch_transformations = []
         self._grad_transformations = []
         self._opt_transformations = []
@@ -89,6 +93,8 @@ class LightningWrapper(pl.LightningModule):
         self.multi_class = multi_class
         self.multi_head = multi_head
 
+        self.save_log = save_log
+
     def forward(self, x):
         if self.multi_head:
             output = self._model(x)
@@ -97,13 +103,6 @@ class LightningWrapper(pl.LightningModule):
             return output
         else:
             return self._model(x)
-
-    def should_accumulate(self):
-        return self.trainer.train_loop.should_accumulate()
-
-    def on_train_epoch_start(self) -> None:
-        for callback in self._on_train_epoch_start_callbacks:
-            callback(self)
 
     def _transform_batch(self, batch, batch_idx, *args):
         for transform in self._batch_transformations:
@@ -154,14 +153,15 @@ class LightningWrapper(pl.LightningModule):
 
         self.manual_backward(training_step_results["loss"])
 
-        if self.should_accumulate():
-            # Special case opacus optimizers to reduce memory footprint
-            # see: (https://github.com/pytorch/opacus/blob/244265582bffbda956511871a907e5de2c523d86/opacus/privacy_engine.py#L393)
-            if hasattr(self.optimizer, "virtual_step"):
-                with torch.no_grad():
-                    self.optimizer.virtual_step()
-        else:
-            self.on_non_accumulate_step()
+        # if self.should_accumulate():
+        #     # Special case opacus optimizers to reduce memory footprint
+        #     # see: (https://github.com/pytorch/opacus/blob/244265582bffbda956511871a907e5de2c523d86/opacus/privacy_engine.py#L393)
+        #     if hasattr(self.optimizer, "virtual_step"):
+        #         with torch.no_grad():
+        #             self.optimizer.virtual_step()
+        # else:
+        #     self.on_non_accumulate_step()
+        self.on_non_accumulate_step()
 
         if self.log_train_acc:
             top1_acc = accuracy(
@@ -169,30 +169,23 @@ class LightningWrapper(pl.LightningModule):
                 training_step_results["transformed_batch"][1],
                 multi_head=self.multi_head,
             )[0]
-            self.log(
-                "step/train_acc",
-                top1_acc,
-                on_step=True,
-                on_epoch=False,
-                prog_bar=True,
-                logger=True,
-            )
+            self.log("step/train_acc", top1_acc,
+                     on_step=True, on_epoch=False,
+                     prog_bar=True, logger=True)
 
         return training_step_results
 
-    def get_batch_gradients(
-            self,
-            batch: torch.tensor,
-            batch_idx: int = 0,
-            create_graph: bool = False,
-            clone_gradients: bool = True,
-            apply_transforms=True,
-            eval_mode: bool = False,
-            stop_track_bn_stats: bool = True,
-            BN_exact: bool = False,
-            attacker: bool = False,
-            *args,
-    ):
+    def get_batch_gradients(self,
+                            batch: torch.tensor,
+                            batch_idx: int = 0,
+                            create_graph: bool = False,
+                            clone_gradients: bool = True,
+                            apply_transforms=True,
+                            eval_mode: bool = False,
+                            stop_track_bn_stats: bool = True,
+                            BN_exact: bool = False,
+                            attacker: bool = False,
+                            *args):
         batch = tuple(k.to(self.device) for k in batch)
         if eval_mode is True:
             self.eval()
@@ -248,14 +241,11 @@ class LightningWrapper(pl.LightningModule):
         if self._log_gradients:
             grad_norm_dict = self.grad_norm(1)
             for k, v in grad_norm_dict.items():
-                self.log(
-                    f"gradients/{k}",
-                    v,
-                    on_step=True,
-                    on_epoch=True,
-                    prog_bar=False,
-                    logger=True,
-                )
+                self.log(f"gradients/{k}", v,
+                         on_step=True,
+                         on_epoch=True,
+                         prog_bar=False,
+                         logger=True)
 
         self.optimizer.step()
         self.optimizer.zero_grad()
@@ -266,14 +256,12 @@ class LightningWrapper(pl.LightningModule):
                 self.trainer.should_stop = True
 
         self.step_tracker.end()
-        self.log(
-            "step/train_loss",
-            self.step_tracker.cur_loss,
-            on_step=True,
-            on_epoch=False,
-            prog_bar=True,
-            logger=True,
-        )
+        self.log("step/train_loss",
+                 self.step_tracker.cur_loss,
+                 on_step=True,
+                 on_epoch=False,
+                 prog_bar=True,
+                 logger=True)
 
     def configure_optimizers(self):
         if self.hparams["optimizer"] == "Adam":
@@ -369,26 +357,23 @@ class LightningWrapper(pl.LightningModule):
 
         self.cur_lr = self.optimizer.param_groups[0]["lr"]
 
-        self.log(
-            "epoch/val_accuracy",
-            avg_accuracy,
-            on_epoch=True,
-            prog_bar=True,
-            logger=True,
-        )
-        self.log("epoch/val_loss",
-                 avg_loss,
-                 on_epoch=True,
-                 prog_bar=True,
+        self.log("epoch/val_accuracy", avg_accuracy,
+                 on_epoch=True, prog_bar=True,
                  logger=True)
-        self.log("epoch/lr",
-                 self.cur_lr,
-                 on_epoch=True,
-                 prog_bar=True,
+        self.log("epoch/val_loss", avg_loss,
+                 on_epoch=True, prog_bar=True,
                  logger=True)
-
-        for callback in self._epoch_end_callbacks:
-            callback(self)
+        self.log("epoch/lr", self.cur_lr,
+                 on_epoch=True, prog_bar=True,
+                 logger=True)
+        # Mannuly save model here.
+        path = Path(f"{self.save_log}/checkpoints/")
+        path.mkdir(parents=True, exist_ok=True)
+        if os.listdir(f"{self.save_log}/checkpoints/"):
+            old_ckpt = os.listdir(f"{self.save_log}/checkpoints/")[0]
+            os.remove(f"{self.save_log}/checkpoints/{old_ckpt}")
+        torch.save(self._model.state_dict(),
+                   f"{self.save_log}/checkpoints/epoch={self.current_epoch}-val_acc_{avg_accuracy}.ckpt")
 
     def test_step(self, batch, batch_idx):
         x, y = batch

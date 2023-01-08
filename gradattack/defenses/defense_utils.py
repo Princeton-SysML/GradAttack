@@ -15,7 +15,6 @@ class DefensePack:
     def __init__(self, args, logger=None):
         self.defense_params = {}
         self.parse_defense_params(args)
-        self.logger = logger  # this might be useful for logging DP prarameters in the future
 
     def apply_defense(self, pipeline: TrainingPipeline):
         dataset = pipeline.datamodule
@@ -104,7 +103,6 @@ class DefensePack:
                         print(Fore.MAGENTA + f"{key}: {val}", end="\t")
                 else:
                     print(Fore.MAGENTA + "None", end="\t")
-                print()
 
     def get_defensepack_str(self):
         def get_param_str(paramname):

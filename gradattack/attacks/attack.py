@@ -2,8 +2,8 @@
 from typing import Callable
 
 import torch
-from gradattack.trainingpipeline import TrainingPipeline
 
+from gradattack.trainingpipeline import TrainingPipeline
 from .gradientinversion import GradientReconstructor
 
 
