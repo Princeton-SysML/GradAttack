@@ -32,7 +32,7 @@ class TrainingPipeline:
     def run(self):
         self.setup_pipeline()
         # If we didn't call setup(), any updates to transforms (e.g. from defenses) wouldn't be applied
-        return self.trainer.fit(self.model, self.datamodule)
+        return self.trainer.fit(self.model, datamodule=self.datamodule)
 
     def test(self):
         return self.trainer.test(

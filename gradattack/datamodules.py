@@ -172,17 +172,20 @@ class BaseDataModule(LightningDataModule):
                 self.train_set,
                 batch_sampler=self.batch_sampler,
                 num_workers=self.num_workers,
+                pin_memory=True
             )
 
     def val_dataloader(self):
         return DataLoader(self.val_set,
                           batch_size=self.batch_size,
-                          num_workers=self.num_workers)
+                          num_workers=self.num_workers,
+                          pin_memory=True)
 
     def test_dataloader(self):
         return DataLoader(self.test_set,
                           batch_size=self.batch_size,
-                          num_workers=self.num_workers)
+                          num_workers=self.num_workers,
+                          pin_memory=True)
 
 
 class ImageNetDataModule(BaseDataModule):

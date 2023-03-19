@@ -406,15 +406,13 @@ class LightningWrapper(pl.LightningModule):
         )
 
 
-def create_lightning_module(
-        model_name: str,
-        num_classes: int,
-        pretrained: bool = False,
-        ckpt: str = None,
-        freeze_extractor: bool = False,
-        *args,
-        **kwargs,
-) -> LightningWrapper:
+def create_lightning_module(model_name: str,
+                            num_classes: int,
+                            pretrained: bool = False,
+                            ckpt: str = None,
+                            freeze_extractor: bool = False,
+                            *args,
+                            **kwargs) -> LightningWrapper:
     if "models" in model_name:  # Official models by PyTorch
         model_name = model_name.replace("models.", "")
         if pretrained is False:
