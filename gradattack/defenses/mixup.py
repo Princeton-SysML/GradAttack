@@ -123,12 +123,7 @@ class MixupDefense(GradientDefense):
             else:
                 return np.asarray(lams), np.asarray(selects)
 
-    def mixup_batch(
-            self,
-            inputs: torch.tensor,
-            lams_b: float,
-            selects_b: np.array,
-    ):
+    def mixup_batch(self, inputs: torch.tensor, lams_b: float, selects_b: np.array):
         """Generate a MixUp batch.
 
         Args:
@@ -139,7 +134,7 @@ class MixupDefense(GradientDefense):
         Returns:
             (torch.tensor): the MixUp images and labels
         """
-        mixed_x = torch.zeros_like(inputs)
+        mixed_x = torch.zeros_like(inputs, device=self.device)
         mixed_y = torch.zeros((len(inputs), self.num_classes),
                               device=self.device)
 

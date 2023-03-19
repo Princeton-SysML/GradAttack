@@ -138,7 +138,7 @@ class InstahideDefense(GradientDefense):
         Returns:
             (torch.tensor): the InstaHide images and labels
         """
-        mixed_x = torch.zeros_like(inputs)
+        mixed_x = torch.zeros_like(inputs, device=self.device)
         mixed_y = torch.zeros((len(inputs), self.num_classes),
                               device=self.device)
 
