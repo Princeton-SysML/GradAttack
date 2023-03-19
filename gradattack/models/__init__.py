@@ -93,8 +93,6 @@ class LightningWrapper(pl.LightningModule):
         self.multi_class = multi_class
         self.multi_head = multi_head
 
-        self.save_log = save_log
-
     def forward(self, x):
         if self.multi_head:
             output = self._model(x)
@@ -329,12 +327,13 @@ class LightningWrapper(pl.LightningModule):
         else:
             loss = self._val_loss_metric(y_hat, y)
         top1_acc = accuracy(y_hat, y, multi_head=self.multi_head)[0]
-        if self.log_auc:
-            pred_list, true_list = auc_list(y_hat, y)
-        else:
-            pred_list, true_list = None, None
+
         self.log('val/loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.log('val/acc', top1_acc, on_epoch=True, prog_bar=True, logger=True)
+
+    def validation_epoch_end(self, outputs):
+        for callback in self._epoch_end_callbacks:
+            callback(self)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
