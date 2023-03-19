@@ -3,14 +3,14 @@ from typing import Any, Callable, Optional
 
 import pytorch_lightning as pl
 import torch
-import torch.nn.functional as F
 import torchmetrics
+from torch.utils.data.dataloader import DataLoader
+from torch.utils.data.dataset import Dataset
+
 from gradattack.metrics.gradients import CosineSimilarity, L2Diff
 from gradattack.metrics.pixelwise import MeanPixelwiseError
 from gradattack.trainingpipeline import TrainingPipeline
 from gradattack.utils import patch_image
-from torch.utils.data.dataloader import DataLoader
-from torch.utils.data.dataset import Dataset
 
 
 # DEFAULT_HPARAMS = {
@@ -358,7 +358,7 @@ class GradientReconstructor(pl.LightningModule):
                             len(recon_mean[i])),
                         global_step=self.global_step,
                     )
-            self.manual_backward(reconstruction_loss, self.optimizer)
+            self.manual_backward(reconstruction_loss)
             if self.hparams["signed_gradients"]:
                 if self.grayscale:
                     self.best_guess_grayscale.grad.sign_()
@@ -399,7 +399,7 @@ class GradientReconstructor(pl.LightningModule):
                         global_step=self.global_step,
                     )
                 psnrs = [
-                    torchmetrics.functional.psnr(a, b)
+                    torchmetrics.functional.peak_signal_noise_ratio(a, b)
                     for (a,
                          b) in zip(self.best_guess, self.ground_truth_inputs)
                 ]

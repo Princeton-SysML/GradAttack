@@ -14,15 +14,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.init as init
 from torch.nn.functional import log_softmax
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="gradattack training")
+    parser = argparse.ArgumentParser(description="GradAttack training")
     parser.add_argument("--gpuid", default="0", type=int, help="gpu id to use")
     parser.add_argument("--model",
-                        default="ResNet18",
+                        default="ResNet34",
                         type=str,
                         help="name of model")
     parser.add_argument("--data",
@@ -47,7 +46,7 @@ def parse_args():
                         default="SGD",
                         type=str,
                         help="which optimizer")
-    parser.add_argument("--lr", default=0.05, type=float, help="initial lr")
+    parser.add_argument("--lr", default=0.4, type=float, help="initial lr")
     parser.add_argument("--decay",
                         default=5e-4,
                         type=float,
@@ -67,7 +66,7 @@ def parse_args():
                         type=float,
                         help="lambda of LambdaLR scheduler")
     parser.add_argument("--lr_factor",
-                        default=0.5,
+                        default=0.2,
                         type=float,
                         help="factor of lr reduction")
     parser.add_argument("--disable_early_stopping",
@@ -255,7 +254,7 @@ def parse_args():
         hparams["lr_step"] = args.lr_step
         hparams["lr_factor"] = args.lr_factor
     elif args.scheduler == "MultiStepLR":
-        hparams["lr_step"] = [100, 150]
+        hparams["lr_step"] = [5, 60, 120, 160]
         hparams["lr_factor"] = args.lr_factor
     elif args.scheduler == "LambdaLR":
         hparams["lr_lambda"] = args.lr_lambda
@@ -287,15 +286,15 @@ def parse_args():
 def parse_augmentation(args):
     return {
         "hflip":
-        args.aug_hflip,
+            args.aug_hflip,
         "crop":
-        args.aug_crop,
+            args.aug_crop,
         "rotation":
-        args.aug_rotation,
+            args.aug_rotation,
         "color_jitter": [float(i) for i in args.aug_colorjitter]
         if args.aug_colorjitter is not None else None,
         "affine":
-        args.aug_affine,
+            args.aug_affine,
     }
 
 
@@ -386,7 +385,7 @@ def patch_image(x, dim=(32, 32)):
             x = np.append(x, np.zeros((pad_size, *x[0].shape)), axis=0)
         batch_size = len(x)
         x = np.transpose(x, (0, 2, 3, 1))
-        if int(np.sqrt(batch_size))**2 == batch_size:
+        if int(np.sqrt(batch_size)) ** 2 == batch_size:
             s = int(np.sqrt(batch_size))
             x = np.reshape(x, (s, s, dim[0], dim[1], 3))
             x = np.concatenate(x, axis=2)

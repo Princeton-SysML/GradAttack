@@ -1,7 +1,7 @@
 import os
-from pathlib import Path
 from typing import Callable
 
+import numpy as np
 import pytorch_lightning as pl
 from sklearn import metrics
 from torch.optim.lr_scheduler import LambdaLR, MultiStepLR, ReduceLROnPlateau, StepLR
@@ -169,7 +169,7 @@ class LightningWrapper(pl.LightningModule):
                 training_step_results["transformed_batch"][1],
                 multi_head=self.multi_head,
             )[0]
-            self.log("step/train_acc", top1_acc,
+            self.log("train/acc", top1_acc,
                      on_step=True, on_epoch=False,
                      prog_bar=True, logger=True)
 
@@ -333,47 +333,8 @@ class LightningWrapper(pl.LightningModule):
             pred_list, true_list = auc_list(y_hat, y)
         else:
             pred_list, true_list = None, None
-        return {
-            "batch/val_loss": loss,
-            "batch/val_accuracy": top1_acc,
-            "batch/val_pred_list": pred_list,
-            "batch/val_true_list": true_list,
-        }
-
-    def validation_epoch_end(self, outputs):
-        # outputs is whatever returned in `validation_step`
-        avg_loss = torch.stack([x["batch/val_loss"] for x in outputs]).mean()
-        avg_accuracy = torch.stack([x["batch/val_accuracy"]
-                                    for x in outputs]).mean()
-        if self.log_auc:
-            self.log_aucs(outputs, stage="val")
-
-        self.current_val_loss = avg_loss
-        if self.current_epoch > 0:
-            if self.hparams["lr_scheduler"] == "ReduceLROnPlateau":
-                self.lr_scheduler.step(self.current_val_loss)
-            else:
-                self.lr_scheduler.step()
-
-        self.cur_lr = self.optimizer.param_groups[0]["lr"]
-
-        self.log("epoch/val_accuracy", avg_accuracy,
-                 on_epoch=True, prog_bar=True,
-                 logger=True)
-        self.log("epoch/val_loss", avg_loss,
-                 on_epoch=True, prog_bar=True,
-                 logger=True)
-        self.log("epoch/lr", self.cur_lr,
-                 on_epoch=True, prog_bar=True,
-                 logger=True)
-        # Mannuly save model here.
-        path = Path(f"{self.save_log}/checkpoints/")
-        path.mkdir(parents=True, exist_ok=True)
-        if os.listdir(f"{self.save_log}/checkpoints/"):
-            old_ckpt = os.listdir(f"{self.save_log}/checkpoints/")[0]
-            os.remove(f"{self.save_log}/checkpoints/{old_ckpt}")
-        torch.save(self._model.state_dict(),
-                   f"{self.save_log}/checkpoints/epoch={self.current_epoch}-val_acc_{avg_accuracy}.ckpt")
+        self.log('val/loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val/acc', top1_acc, on_epoch=True, prog_bar=True, logger=True)
 
     def test_step(self, batch, batch_idx):
         x, y = batch

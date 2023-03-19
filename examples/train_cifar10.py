@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers import WandbLogger
 
 from gradattack.datamodules import CIFAR10DataModule
 from gradattack.defenses.defense_utils import DefensePack
@@ -10,18 +10,25 @@ from gradattack.trainingpipeline import TrainingPipeline
 from gradattack.utils import cross_entropy_for_onehot, parse_args, parse_augmentation
 
 if __name__ == "__main__":
-
     args, hparams, _ = parse_args()
-
-    logger = TensorBoardLogger(
-        "tb_logs", name=f"{args.logname}/{args.optimizer}/{args.scheduler}")
-    devices = [args.gpuid]
+    method = ""
+    if args.defense_mixup:
+        method += 'mixup_'
+    elif args.defense_instahide:
+        method += 'instahide_'
+    elif args.defense_gradprune:
+        method += 'gradprune_'
+    logger = WandbLogger(
+        project='FLock_GradAttack',
+        name=f"CIFAR10/{method}/{args.scheduler}",
+        log_model=True
+    )
 
     if args.early_stopping:
         early_stop_callback = EarlyStopping(
             monitor="epoch/val_loss",
             min_delta=0.00,
-            patience=args.patience,
+            patience=20,
             verbose=False,
             mode="min",
         )
@@ -62,8 +69,8 @@ if __name__ == "__main__":
     )
 
     trainer = pl.Trainer(
-        gpus=devices,
-        check_val_every_n_epoch=1,
+        devices=1,
+        check_val_every_n_epoch=3,
         logger=logger,
         max_epochs=args.n_epoch,
         callbacks=[early_stop_callback],

@@ -1,4 +1,5 @@
 import os
+
 import numpy as np
 import pytorch_lightning as pl
 import torch
@@ -65,14 +66,14 @@ def setup_attack():
                                         datamodule.num_classes,
                                         training_loss_metric=loss,
                                         pretrained=False,
-                                        ckpt="checkpoint/InstaHide_ckpt.ckpt",
+                                        # ckpt="checkpoint/InstaHide_ckpt.ckpt",
                                         **hparams).to(DEVICE)
     elif args.defense_mixup:
         model = create_lightning_module(args.model,
                                         datamodule.num_classes,
                                         training_loss_metric=loss,
                                         pretrained=False,
-                                        ckpt="checkpoint/Mixup_ckpt.ckpt",
+                                        # ckpt="checkpoint/Mixup_ckpt.ckpt",
                                         **hparams).to(DEVICE)
     else:
         model = create_lightning_module(
@@ -80,11 +81,11 @@ def setup_attack():
             datamodule.num_classes,
             training_loss_metric=loss,
             pretrained=False,
-            ckpt="checkpoint/vanilla_epoch=1-step=1531.ckpt",
+            # ckpt="checkpoint/vanilla_epoch=1-step=1531.ckpt",
             **hparams).to(DEVICE)
 
     logger = TensorBoardLogger("tb_logs", name=f"{args.logname}")
-    trainer = pl.Trainer(gpus=devices, benchmark=True, logger=logger)
+    trainer = pl.Trainer(devices=-1, accelerator="auto", benchmark=True, logger=logger)
     pipeline = TrainingPipeline(model, datamodule, trainer)
 
     defense_pack = DefensePack(args, logger)
@@ -176,10 +177,10 @@ def run_attack(pipeline, attack_hparams):
             mean_std=(dm, ds),
             attacker_eval_mode=attack_hparams["attacker_eval_mode"],
             BN_exact=attack_hparams["BN_exact"])
-
         tb_logger = TensorBoardLogger(BATCH_ROOT_DIR, name="tb_log")
         attack_trainer = pl.Trainer(
-            gpus=devices,
+            devices=1,
+            accelerator="auto",
             logger=tb_logger,
             max_epochs=1,
             benchmark=True,

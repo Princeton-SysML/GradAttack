@@ -12,7 +12,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-import torchvision
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -242,6 +241,5 @@ def test():
     net = ResNet18()
     y = net(Variable(torch.randn(1, 3, 32, 32)))
     print(y.size())
-
 
 # test()

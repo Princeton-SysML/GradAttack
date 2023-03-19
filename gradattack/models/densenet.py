@@ -4,7 +4,6 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from torch.autograd import Variable
 
 
@@ -127,6 +126,5 @@ def test_densenet():
     x = torch.randn(1, 3, 32, 32)
     y = net(Variable(x))
     print(y)
-
 
 # test_densenet()

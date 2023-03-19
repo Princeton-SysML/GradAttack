@@ -1,5 +1,3 @@
-from argparse import Namespace
-
 vanilla_hparams = {
     "optimizer": "SGD",
     "lr": 0.05,

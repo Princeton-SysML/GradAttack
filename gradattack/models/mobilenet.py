@@ -12,6 +12,7 @@ from torch.autograd import Variable
 
 class Block(nn.Module):
     """Depthwise conv + Pointwise conv"""
+
     def __init__(self, in_planes, out_planes, stride=1):
         super(Block, self).__init__()
         self.conv1 = nn.Conv2d(
@@ -91,6 +92,5 @@ def test():
     x = torch.randn(1, 3, 32, 32)
     y = net(Variable(x))
     print(y.size())
-
 
 # test()

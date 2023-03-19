@@ -1,5 +1,6 @@
 """
-The decode step for InstaHide and MixUp is based on Carlini et al.'s attack: Is Private Learning Possible with Instance Encoding? (https://arxiv.org/pdf/2011.05315.pdf)
+The decode step for InstaHide and MixUp is based on Carlini et al.'s attack:
+Is Private Learning Possible with Instance Encoding? (https://arxiv.org/pdf/2011.05315.pdf)
 The implementation heavily relies on their code: https://github.com/carlini/privacy/commit/28b8a80924cf3766ab3230b5976388139ddef295 
 """
 

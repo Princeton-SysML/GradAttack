@@ -428,7 +428,7 @@ class CIFAR10DataModule(BaseDataModule):
             self.attack_indices, self.class2attacksample = extract_attack_set(
                 ori_train_set, seed=self.seed)
             self.train_set = Subset(ori_train_set, self.attack_indices)
-            self.test_set = Subset(self.test_set, range(100))
+            self.test_set = Subset(self.test_set, range(200))
         elif stage == "attack_mini":
             ori_train_set = self.base_dataset(
                 self.data_dir,
@@ -438,7 +438,7 @@ class CIFAR10DataModule(BaseDataModule):
             self.attack_indices, self.class2attacksample = extract_attack_set(
                 ori_train_set, sample_per_class=2)
             self.train_set = Subset(ori_train_set, self.attack_indices)
-            self.test_set = Subset(self.test_set, range(100))
+            self.test_set = Subset(self.test_set, range(200))
         elif stage == "attack_large":
             ori_train_set = self.base_dataset(
                 self.data_dir,
@@ -448,7 +448,7 @@ class CIFAR10DataModule(BaseDataModule):
             self.attack_indices, self.class2attacksample = extract_attack_set(
                 ori_train_set, sample_per_class=500)
             self.train_set = Subset(ori_train_set, self.attack_indices)
-            self.test_set = Subset(self.test_set, range(100))
+            self.test_set = Subset(self.test_set, range(200))
 
 
 class CIFAR100DataModule(CIFAR10DataModule):
