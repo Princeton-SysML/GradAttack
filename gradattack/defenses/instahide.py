@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import torchcsprng as csprng
 from torch.distributions.dirichlet import Dirichlet
 from torch.nn.functional import one_hot
 from torch.utils.data.dataset import Dataset
@@ -51,11 +50,11 @@ class InstahideDefense(GradientDefense):
             torch.tensor(self.alpha).repeat(self.dataset_size, 1))
         self.use_csprng = use_csprng
 
-        if self.use_csprng:
-            if cs_prng is None:
-                self.cs_prng = csprng.create_random_device_generator()
-            else:
-                self.cs_prng = cs_prng
+        # if self.use_csprng:
+        #     if cs_prng is None:
+        #         self.cs_prng = csprng.create_random_device_generator()
+        #     else:
+        #         self.cs_prng = cs_prng
 
     # @profile
     def generate_mapping(self, return_tensor=True):

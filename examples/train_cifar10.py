@@ -1,5 +1,6 @@
 import pytorch_lightning as pl
 import torch
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 
@@ -19,19 +20,22 @@ if __name__ == "__main__":
     elif args.defense_gradprune:
         method += 'gradprune_'
     logger = WandbLogger(
-        project='FLock_GradAttack',
+        project='GradAttack',
         name=f"CIFAR10/{method}/{args.scheduler}",
         log_model=True
     )
 
     if args.early_stopping:
         early_stop_callback = EarlyStopping(
-            monitor="epoch/val_loss",
+            monitor="val/loss",
             min_delta=0.00,
             patience=20,
             verbose=False,
             mode="min",
         )
+
+    checkpoint_callback = ModelCheckpoint(
+    )
 
     augment = parse_augmentation(args)
 
@@ -47,11 +51,11 @@ if __name__ == "__main__":
     if args.defense_instahide or args.defense_mixup:
         loss = cross_entropy_for_onehot
     else:
-        loss = torch.nn.CrossEntropyLoss(reduction="mean")
+        loss = torch.nn.CrossEntropyLoss()
 
     if "multihead" in args.model:
         multi_head = True
-        loss = torch.nn.CrossEntropyLoss(reduction="mean")
+        loss = torch.nn.CrossEntropyLoss()
     else:
         multi_head = False
 
