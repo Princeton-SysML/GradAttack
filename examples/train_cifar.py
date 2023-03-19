@@ -30,7 +30,6 @@ if __name__ == "__main__":
     logger = WandbLogger(
         project='GradAttack',
         name=exp_name,
-        log_model=True
     )
 
     early_stop_callback = EarlyStopping(
@@ -74,10 +73,12 @@ if __name__ == "__main__":
         log_auc=args.log_auc,
         multi_class=datamodule.multi_class,
         multi_head=multi_head,
+        log_dir=exp_name,
         **hparams,
     )
 
     trainer = pl.Trainer(
+        default_root_dir=exp_name,
         devices=1,
         check_val_every_n_epoch=3,
         accelerator='auto',
@@ -90,7 +91,7 @@ if __name__ == "__main__":
     )
     pipeline = TrainingPipeline(model, datamodule, trainer)
 
-    defense_pack = DefensePack(args, logger)
+    defense_pack = DefensePack(args)
     defense_pack.apply_defense(pipeline)
 
     pipeline.run()

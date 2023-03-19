@@ -12,7 +12,7 @@ INDENT = "\t"
 
 
 class DefensePack:
-    def __init__(self, args, logger=None):
+    def __init__(self, args):
         self.defense_params = {}
         self.parse_defense_params(args)
 

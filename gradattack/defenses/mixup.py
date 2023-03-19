@@ -99,8 +99,7 @@ class MixupDefense(GradientDefense):
             lams = self.lambda_sampler_whole.sample().to(self.device)
             selects = torch.stack([
                 torch.randperm(self.dataset_size,
-                               device=self.device,
-                               generator=self.cs_prng)
+                               device=self.device)
                 for _ in range(self.klam)
             ])
             selects = torch.transpose(selects, 0, 1)
