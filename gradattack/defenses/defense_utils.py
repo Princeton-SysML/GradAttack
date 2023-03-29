@@ -1,11 +1,7 @@
-from typing import Any, Dict, Iterable, List, Optional, Union
-
 import torch
-from colorama import Back, Fore, Style, init
-from torch.utils.data.dataset import Dataset
+from colorama import Fore, Style, init
 
 from gradattack.trainingpipeline import TrainingPipeline
-
 from .dpsgd import DPSGDDefense
 from .gradprune import GradPruneDefense
 from .instahide import InstahideDefense
@@ -16,10 +12,9 @@ INDENT = "\t"
 
 
 class DefensePack:
-    def __init__(self, args, logger=None):
+    def __init__(self, args):
         self.defense_params = {}
         self.parse_defense_params(args)
-        self.logger = logger  # this might be useful for logging DP prarameters in the future
 
     def apply_defense(self, pipeline: TrainingPipeline):
         dataset = pipeline.datamodule
@@ -108,7 +103,6 @@ class DefensePack:
                         print(Fore.MAGENTA + f"{key}: {val}", end="\t")
                 else:
                     print(Fore.MAGENTA + "None", end="\t")
-                print()
 
     def get_defensepack_str(self):
         def get_param_str(paramname):

@@ -1,27 +1,21 @@
-# FIXME: @Samyak, could you please help add docstring to this file? Thanks!
 import os
-import time
-from typing import Any, Callable, Optional
+from typing import Callable
 
 import pytorch_lightning as pl
-import torch.nn.functional as F
-import torchvision.models as models
-from gradattack.utils import StandardizeLayer
-from sklearn import metrics
-from torch.nn import init
 from torch.optim.lr_scheduler import LambdaLR, MultiStepLR, ReduceLROnPlateau, StepLR
 
+from gradattack.utils import StandardizeLayer
+from .LeNet import *
 from .covidmodel import *
 from .densenet import *
 from .googlenet import *
 from .mobilenet import *
+from .multihead_resnet import *
 from .nasnet import *
 from .resnet import *
 from .resnext import *
 from .simple import *
 from .vgg import *
-from .multihead_resnet import *
-from .LeNet import *
 
 
 class StepTracker:
@@ -38,23 +32,24 @@ class StepTracker:
 
 class LightningWrapper(pl.LightningModule):
     """Wraps a torch module in a pytorch-lightning module. Any ."""
+
     def __init__(
-        self,
-        model: torch.nn.Module,
-        training_loss_metric: Callable = F.mse_loss,
-        optimizer: str = "SGD",
-        lr_scheduler: str = "ReduceLROnPlateau",
-        tune_on_val: float = 0.02,
-        lr_factor: float = 0.5,
-        lr_step: int = 10,
-        batch_size: int = 64,
-        lr: float = 0.05,
-        momentum: float = 0.9,
-        weight_decay: float = 5e-4,
-        nesterov: bool = False,
-        log_auc: bool = False,
-        multi_class: bool = False,
-        multi_head: bool = False,
+            self,
+            model: torch.nn.Module,
+            training_loss_metric: Callable = F.mse_loss,
+            optimizer: str = "SGD",
+            lr_scheduler: str = "ReduceLROnPlateau",
+            tune_on_val: float = 0.02,
+            lr_factor: float = 0.5,
+            lr_step: int = 10,
+            batch_size: int = 64,
+            lr: float = 0.05,
+            momentum: float = 0.9,
+            weight_decay: float = 5e-4,
+            nesterov: bool = False,
+            log_auc: bool = False,
+            multi_class: bool = False,
+            multi_head: bool = False,
     ):
         super().__init__()
         # if we didn't copy here, then we would modify the default dict by accident
@@ -126,7 +121,6 @@ class LightningWrapper(pl.LightningModule):
         Args:
             batch : The batch inputs. Should be a torch tensor with outermost dimension 2, where dimension 0 corresponds to inputs and dimension 1
             corresponds to labels.
-
         Returns:
             dict: The results from the training step. Is a dictionary with keys "loss", "transformed_batch", and "model_outputs".
         """
@@ -158,14 +152,15 @@ class LightningWrapper(pl.LightningModule):
 
         self.manual_backward(training_step_results["loss"])
 
-        if self.should_accumulate():
-            # Special case opacus optimizers to reduce memory footprint
-            # see: (https://github.com/pytorch/opacus/blob/244265582bffbda956511871a907e5de2c523d86/opacus/privacy_engine.py#L393)
-            if hasattr(self.optimizer, "virtual_step"):
-                with torch.no_grad():
-                    self.optimizer.virtual_step()
-        else:
-            self.on_non_accumulate_step()
+        # if self.should_accumulate():
+        #     # Special case opacus optimizers to reduce memory footprint
+        #     # see: (https://github.com/pytorch/opacus/blob/244265582bffbda956511871a907e5de2c523d86/opacus/privacy_engine.py#L393)
+        #     if hasattr(self.optimizer, "virtual_step"):
+        #         with torch.no_grad():
+        #             self.optimizer.virtual_step()
+        # else:
+        #     self.on_non_accumulate_step()
+        self.on_non_accumulate_step()
 
         if self.log_train_acc:
             top1_acc = accuracy(
@@ -184,19 +179,17 @@ class LightningWrapper(pl.LightningModule):
 
         return training_step_results
 
-    def get_batch_gradients(
-        self,
-        batch: torch.tensor,
-        batch_idx: int = 0,
-        create_graph: bool = False,
-        clone_gradients: bool = True,
-        apply_transforms=True,
-        eval_mode: bool = False,
-        stop_track_bn_stats: bool = True,
-        BN_exact: bool = False,
-        attacker: bool = False,
-        *args,
-    ):
+    def get_batch_gradients(self,
+                            batch: torch.tensor,
+                            batch_idx: int = 0,
+                            create_graph: bool = False,
+                            clone_gradients: bool = True,
+                            apply_transforms=True,
+                            eval_mode: bool = False,
+                            stop_track_bn_stats: bool = True,
+                            BN_exact: bool = False,
+                            attacker: bool = False,
+                            *args):
         batch = tuple(k.to(self.device) for k in batch)
         if eval_mode is True:
             self.eval()
@@ -317,7 +310,7 @@ class LightningWrapper(pl.LightningModule):
         elif self.hparams["lr_scheduler"] == "LambdaLR":
             self.lr_scheduler = LambdaLR(
                 self.optimizer,
-                lr_lambda=[lambda epoch: self.hparams["lr_lambda"]**epoch],
+                lr_lambda=[lambda epoch: self.hparams["lr_lambda"] ** epoch],
                 verbose=True,
             )
         elif self.hparams["lr_scheduler"] == "ReduceLROnPlateau":
@@ -345,54 +338,8 @@ class LightningWrapper(pl.LightningModule):
         else:
             loss = self._val_loss_metric(y_hat, y)
         top1_acc = accuracy(y_hat, y, multi_head=self.multi_head)[0]
-        if self.log_auc:
-            pred_list, true_list = auc_list(y_hat, y)
-        else:
-            pred_list, true_list = None, None
-        return {
-            "batch/val_loss": loss,
-            "batch/val_accuracy": top1_acc,
-            "batch/val_pred_list": pred_list,
-            "batch/val_true_list": true_list,
-        }
-
-    def validation_epoch_end(self, outputs):
-        # outputs is whatever returned in `validation_step`
-        avg_loss = torch.stack([x["batch/val_loss"] for x in outputs]).mean()
-        avg_accuracy = torch.stack([x["batch/val_accuracy"]
-                                    for x in outputs]).mean()
-        if self.log_auc:
-            self.log_aucs(outputs, stage="val")
-
-        self.current_val_loss = avg_loss
-        if self.current_epoch > 0:
-            if self.hparams["lr_scheduler"] == "ReduceLROnPlateau":
-                self.lr_scheduler.step(self.current_val_loss)
-            else:
-                self.lr_scheduler.step()
-
-        self.cur_lr = self.optimizer.param_groups[0]["lr"]
-
-        self.log(
-            "epoch/val_accuracy",
-            avg_accuracy,
-            on_epoch=True,
-            prog_bar=True,
-            logger=True,
-        )
-        self.log("epoch/val_loss",
-                 avg_loss,
-                 on_epoch=True,
-                 prog_bar=True,
-                 logger=True)
-        self.log("epoch/lr",
-                 self.cur_lr,
-                 on_epoch=True,
-                 prog_bar=True,
-                 logger=True)
-
-        for callback in self._epoch_end_callbacks:
-            callback(self)
+        self.log('val/loss', loss, on_epoch=True, logger=True)
+        self.log('val/acc', top1_acc, on_epoch=True, logger=True)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -405,73 +352,22 @@ class LightningWrapper(pl.LightningModule):
         else:
             loss = self._val_loss_metric(y_hat, y)
         top1_acc = accuracy(y_hat, y, multi_head=self.multi_head)[0]
-        if self.log_auc:
-            pred_list, true_list = auc_list(y_hat, y)
-        else:
-            pred_list, true_list = None, None
-        return {
-            "batch/test_loss": loss,
-            "batch/test_accuracy": top1_acc,
-            "batch/test_pred_list": pred_list,
-            "batch/test_true_list": true_list,
-        }
-
-    def test_epoch_end(self, outputs):
-        avg_loss = torch.stack([x["batch/test_loss"] for x in outputs]).mean()
-        avg_accuracy = torch.stack([x["batch/test_accuracy"]
-                                    for x in outputs]).mean()
-        if self.log_auc:
-            self.log_aucs(outputs, stage="test")
-
-        self.log("run/test_accuracy",
-                 avg_accuracy,
-                 on_epoch=True,
-                 prog_bar=True,
-                 logger=True)
-        self.log("run/test_loss",
-                 avg_loss,
-                 on_epoch=True,
-                 prog_bar=True,
-                 logger=True)
-
-    def log_aucs(self, outputs, stage="test"):
-        pred_list = np.concatenate(
-            [x[f"batch/{stage}_pred_list"] for x in outputs])
-        true_list = np.concatenate(
-            [x[f"batch/{stage}_true_list"] for x in outputs])
-
-        aucs = []
-        for c in range(len(pred_list[0])):
-            fpr, tpr, thresholds = metrics.roc_curve(true_list[:, c],
-                                                     pred_list[:, c],
-                                                     pos_label=1)
-            auc_val = metrics.auc(fpr, tpr)
-            aucs.append(auc_val)
-
-            self.log(
-                f"epoch/{stage}_auc/class_{c}",
-                auc_val,
-                on_epoch=True,
-                prog_bar=False,
-                logger=True,
-            )
-        self.log(
-            f"epoch/{stage}_auc/avg",
-            np.mean(aucs),
-            on_epoch=True,
-            prog_bar=True,
-            logger=True,
-        )
+        # if self.log_auc:
+        #     pred_list, true_list = auc_list(y_hat, y)
+        # else:
+        #     pred_list, true_list = None, None
+        self.log('test/loss', loss, logger=True, on_epoch=True)
+        self.log('test/acc', top1_acc, logger=True, on_epoch=True)
 
 
 def create_lightning_module(
-    model_name: str,
-    num_classes: int,
-    pretrained: bool = False,
-    ckpt: str = None,
-    freeze_extractor: bool = False,
-    *args,
-    **kwargs,
+        model_name: str,
+        num_classes: int,
+        pretrained: bool = False,
+        ckpt: str = None,
+        freeze_extractor: bool = False,
+        *args,
+        **kwargs,
 ) -> LightningWrapper:
     if "models" in model_name:  # Official models by PyTorch
         model_name = model_name.replace("models.", "")
@@ -524,12 +420,12 @@ def do_freeze_extractor(model):
 def multihead_accuracy(output, target):
     prec1 = []
     for j in range(output.size(1)):
-        acc = accuracy(output[:, j], target[:, j], topk=(1, ))
+        acc = accuracy(output[:, j], target[:, j], topk=(1,))
         prec1.append(acc[0])
     return torch.mean(torch.Tensor(prec1))
 
 
-def accuracy(output, target, topk=(1, ), multi_head=False):
+def accuracy(output, target, topk=(1,), multi_head=False):
     """Computes the precision@k for the specified values of k"""
     with torch.no_grad():
         maxk = max(topk)
@@ -554,11 +450,3 @@ def accuracy(output, target, topk=(1, ), multi_head=False):
                 correct *= 100.0 / (batch_size * target.size(1))
                 res = [correct]
     return res
-
-
-def auc_list(output, target):
-    assert len(target.size()) == 2
-    pred_list = torch.sigmoid(output).cpu().detach().numpy()
-    true_list = target.cpu().detach().numpy()
-
-    return pred_list, true_list

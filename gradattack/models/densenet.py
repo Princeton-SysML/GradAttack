@@ -4,7 +4,6 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from torch.autograd import Variable
 
 
@@ -17,10 +16,8 @@ class Bottleneck(nn.Module):
                                kernel_size=1,
                                bias=False)
         self.bn2 = nn.BatchNorm2d(4 * growth_rate)
-        self.conv2 = nn.Conv2d(4 * growth_rate,
-                               growth_rate,
-                               kernel_size=3,
-                               padding=1,
+        self.conv2 = nn.Conv2d(4 * growth_rate, growth_rate,
+                               kernel_size=3, padding=1,
                                bias=False)
 
     def forward(self, x):
@@ -43,9 +40,7 @@ class Transition(nn.Module):
 
 
 class DenseNet(nn.Module):
-    def __init__(self,
-                 block,
-                 nblocks,
+    def __init__(self, block, nblocks,
                  growth_rate=12,
                  reduction=0.5,
                  num_classes=10):
@@ -127,6 +122,5 @@ def test_densenet():
     x = torch.randn(1, 3, 32, 32)
     y = net(Variable(x))
     print(y)
-
 
 # test_densenet()

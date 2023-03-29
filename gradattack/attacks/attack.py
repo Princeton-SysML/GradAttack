@@ -2,23 +2,22 @@
 from typing import Callable
 
 import torch
-from numpy.lib.npyio import load
-from gradattack.trainingpipeline import TrainingPipeline
 
-from .invertinggradients.inversefed.reconstruction_algorithms import (
-    GradientReconstructor, )
+from gradattack.trainingpipeline import TrainingPipeline
+from .gradientinversion import GradientReconstructor
 
 
 class GradientInversionAttack:
     """Wrapper around Gradient Inversion attack"""
+
     def __init__(
-        self,
-        pipeline: TrainingPipeline,
-        dm,
-        ds,
-        device: torch.device,
-        loss_metric: Callable,
-        reconstructor_args: dict = None,
+            self,
+            pipeline: TrainingPipeline,
+            dm,
+            ds,
+            device: torch.device,
+            loss_metric: Callable,
+            reconstructor_args: dict = None,
     ):
         self.pipeline = pipeline
         self.device = device
@@ -58,5 +57,5 @@ class GradientInversionAttack:
         self.model.load_state_dict(loaded_data["model_state_dict"])
         batch_inputs, batch_targets = (
             dataset[i][0] for i in loaded_data["batch_indices"]), (
-                dataset[i][1] for i in loaded_data["batch_indices"])
+            dataset[i][1] for i in loaded_data["batch_indices"])
         return self.run_attack_batch(batch_inputs, batch_targets)

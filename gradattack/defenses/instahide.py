@@ -4,7 +4,6 @@ from torch.distributions.dirichlet import Dirichlet
 from torch.nn.functional import one_hot
 from torch.utils.data.dataset import Dataset
 
-import torchcsprng as csprng
 from gradattack.defenses.defense import GradientDefense
 from gradattack.trainingpipeline import TrainingPipeline
 
@@ -51,11 +50,11 @@ class InstahideDefense(GradientDefense):
             torch.tensor(self.alpha).repeat(self.dataset_size, 1))
         self.use_csprng = use_csprng
 
-        if self.use_csprng:
-            if cs_prng is None:
-                self.cs_prng = csprng.create_random_device_generator()
-            else:
-                self.cs_prng = cs_prng
+        # if self.use_csprng:
+        #     if cs_prng is None:
+        #         self.cs_prng = csprng.create_random_device_generator()
+        #     else:
+        #         self.cs_prng = cs_prng
 
     # @profile
     def generate_mapping(self, return_tensor=True):
@@ -124,10 +123,10 @@ class InstahideDefense(GradientDefense):
                 return np.asarray(lams), np.asarray(selects)
 
     def instahide_batch(
-        self,
-        inputs: torch.tensor,
-        lams_b: float,
-        selects_b: np.array,
+            self,
+            inputs: torch.tensor,
+            lams_b: float,
+            selects_b: np.array,
     ):
         """Generate an InstaHide batch.
 
@@ -139,7 +138,7 @@ class InstahideDefense(GradientDefense):
         Returns:
             (torch.tensor): the InstaHide images and labels
         """
-        mixed_x = torch.zeros_like(inputs)
+        mixed_x = torch.zeros_like(inputs, device=self.device)
         mixed_y = torch.zeros((len(inputs), self.num_classes),
                               device=self.device)
 

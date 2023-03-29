@@ -1,15 +1,12 @@
 # DPSGD defense. The implementation of DPSGD is based on Opacus: https://opacus.ai/
 
-import time
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import List
 
-import numpy as np
 import pytorch_lightning as pl
-import torch
 from opacus import PrivacyEngine
-from opacus.utils.module_modification import convert_batchnorm_modules
 from opacus.utils.uniform_sampler import UniformWithReplacementSampler
 from pytorch_lightning.core.datamodule import LightningDataModule
+
 from gradattack.defenses.defense import GradientDefense
 from gradattack.models import StepTracker
 from gradattack.trainingpipeline import TrainingPipeline
@@ -31,17 +28,18 @@ class DPSGDDefense(GradientDefense):
         secure_rng (bool, optional): If on, it will use ``torchcsprng`` for secure random number generation. Comes with a significant performance cost. Defaults to False.
         freeze_extractor (bool, optional): If on, only finetune the classifier (the final fully-connected layers). Defaults to False.
     """
+
     def __init__(
-        self,
-        mini_batch_size: int,
-        sample_size: int,
-        n_accumulation_steps: int,
-        max_grad_norm: float,
-        noise_multiplier: float,
-        delta_list: List[float] = [1e-3, 1e-4, 1e-5],
-        max_epsilon: float = 2,
-        secure_rng: bool = False,
-        freeze_extractor: bool = False,
+            self,
+            mini_batch_size: int,
+            sample_size: int,
+            n_accumulation_steps: int,
+            max_grad_norm: float,
+            noise_multiplier: float,
+            delta_list: List[float] = [1e-3, 1e-4, 1e-5],
+            max_epsilon: float = 2,
+            secure_rng: bool = False,
+            freeze_extractor: bool = False,
     ):
 
         super().__init__()

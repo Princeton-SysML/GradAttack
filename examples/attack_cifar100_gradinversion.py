@@ -7,19 +7,19 @@ from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 from torch.nn.modules.loss import CrossEntropyLoss
 
 from gradattack.attacks.gradientinversion import GradientReconstructor
-from gradattack.datamodules import CIFAR10DataModule
+from gradattack.datamodules import CIFAR100DataModule
 from gradattack.defenses.defense_utils import DefensePack
 from gradattack.models import create_lightning_module
 from gradattack.trainingpipeline import TrainingPipeline
 from gradattack.utils import (cross_entropy_for_onehot, parse_args,
                               patch_image, save_fig)
 
-cifar10_mean = torch.tensor(
-    [0.4914672374725342, 0.4822617471218109, 0.4467701315879822])
-cifar10_std = torch.tensor(
-    [0.24703224003314972, 0.24348513782024384, 0.26158785820007324])
-dm = cifar10_mean[:, None, None]
-ds = cifar10_std[:, None, None]
+cifar100_mean = torch.tensor(
+    [0.50705882, 0.48666667, 0.44078431])
+cifar100_std = torch.tensor(
+    [0.26745098, 0.25647059, 0.27607843])
+dm = cifar100_mean[:, None, None]
+ds = cifar100_std[:, None, None]
 
 
 def setup_attack():
@@ -33,7 +33,7 @@ def setup_attack():
     EPOCH = attack_hparams["epoch"]
     devices = [args.gpuid]
 
-    pl.utilities.seed.seed_everything(42 + EPOCH)
+    pl.utilities.seed.seed_everything(1234 + EPOCH)
     torch.backends.cudnn.benchmark = True
 
     BN_str = ''
@@ -46,15 +46,15 @@ def setup_attack():
         BN_str = 'BN_exact'
         attack_hparams['attacker_eval_mode'] = False
 
-    datamodule = CIFAR10DataModule(batch_size=args.batch_size,
-                                   augment={
-                                       "hflip": False,
-                                       "color_jitter": None,
-                                       "rotation": -1,
-                                       "crop": False
-                                   },
-                                   num_workers=1,
-                                   seed=args.data_seed)
+    datamodule = CIFAR100DataModule(batch_size=args.batch_size,
+                                    augment={
+                                        "hflip": False,
+                                        "color_jitter": None,
+                                        "rotation": -1,
+                                        "crop": False
+                                    },
+                                    num_workers=1,
+                                    seed=args.data_seed)
     print("Loaded data!")
     if args.defense_instahide or args.defense_mixup:  # Customize loss
         loss = cross_entropy_for_onehot
@@ -62,14 +62,14 @@ def setup_attack():
         loss = CrossEntropyLoss(reduction="mean")
 
     if args.defense_instahide:
-        model = create_lightning_module("ResNet18",
+        model = create_lightning_module(args.model,
                                         datamodule.num_classes,
                                         training_loss_metric=loss,
                                         pretrained=False,
                                         # ckpt="checkpoint/InstaHide_ckpt.ckpt",
                                         **hparams).to(DEVICE)
     elif args.defense_mixup:
-        model = create_lightning_module("ResNet18",
+        model = create_lightning_module(args.model,
                                         datamodule.num_classes,
                                         training_loss_metric=loss,
                                         pretrained=False,
@@ -77,7 +77,7 @@ def setup_attack():
                                         **hparams).to(DEVICE)
     else:
         model = create_lightning_module(
-            "ResNet18",
+            args.model,
             datamodule.num_classes,
             training_loss_metric=loss,
             pretrained=False,
@@ -98,7 +98,7 @@ def setup_attack():
 
     defense_pack.apply_defense(pipeline)
 
-    ROOT_DIR = f"{args.results_dir}/CIFAR10-{args.batch_size}-{str(defense_pack)}/tv={attack_hparams['total_variation']}{BN_str}-bn={attack_hparams['bn_reg']}-dataseed={args.data_seed}/Epoch_{EPOCH}"
+    ROOT_DIR = f"{args.results_dir}/CIFAR100-{args.batch_size}-{str(defense_pack)}/tv={attack_hparams['total_variation']}{BN_str}-bn={attack_hparams['bn_reg']}-dataseed={args.data_seed}/Epoch_{EPOCH}"
     try:
         os.makedirs(ROOT_DIR, exist_ok=True)
     except FileExistsError:
@@ -177,10 +177,10 @@ def run_attack(pipeline, attack_hparams):
             mean_std=(dm, ds),
             attacker_eval_mode=attack_hparams["attacker_eval_mode"],
             BN_exact=attack_hparams["BN_exact"])
-
         tb_logger = TensorBoardLogger(BATCH_ROOT_DIR, name="tb_log")
         attack_trainer = pl.Trainer(
-            devices=1, accelerator="auto",
+            devices=1,
+            accelerator="auto",
             logger=tb_logger,
             max_epochs=1,
             benchmark=True,

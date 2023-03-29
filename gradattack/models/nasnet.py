@@ -10,7 +10,6 @@ import torch.nn as nn
 
 class SeperableConv2d(nn.Module):
     def __init__(self, input_channels, output_channels, kernel_size, **kwargs):
-
         super().__init__()
         self.depthwise = nn.Conv2d(input_channels,
                                    input_channels,
@@ -63,6 +62,7 @@ class Fit(nn.Module):
         prev_filters: filter number of tensor prev, needs to be modified
         filters: filter number of normal cell branch output filters
     """
+
     def __init__(self, prev_filters, filters):
         super().__init__()
         self.relu = nn.ReLU()
@@ -242,7 +242,8 @@ class ReductionCell(nn.Module):
         return (
             torch.cat(
                 [
-                    layer1block2,  # https://github.com/keras-team/keras-applications/blob/master/keras_applications/nasnet.py line 739
+                    layer1block2,
+                    # https://github.com/keras-team/keras-applications/blob/master/keras_applications/nasnet.py line 739
                     layer1block3,
                     layer2block1,
                     layer2block2,
@@ -314,7 +315,6 @@ class NasNetA(nn.Module):
 
         layers = []
         for i in range(reduction_num):
-
             layers.extend(
                 self._make_normal(NormalCell, repeat_cell_num, self.filters))
             self.filters *= 2
@@ -339,6 +339,5 @@ class NasNetA(nn.Module):
 
 
 def nasnet(num_classes=100):
-
     # stem filters must be 44, it's a pytorch workaround, cant change to other number
     return NasNetA(4, 2, 44, 44, num_classes=num_classes)

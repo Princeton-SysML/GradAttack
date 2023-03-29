@@ -1,9 +1,6 @@
 """GoogLeNet with PyTorch."""
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-
-from torch.autograd import Variable
 
 
 class Inception(nn.Module):
@@ -99,7 +96,6 @@ class GoogLeNet(nn.Module):
         out = out.view(out.size(0), -1)
         out = self.linear(out)
         return out
-
 
 # net = GoogLeNet()
 # x = torch.randn(1,3,32,32)

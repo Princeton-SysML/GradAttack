@@ -1,10 +1,10 @@
 import numpy as np
 import torch
+# import torchcsprng as csprng
 from torch.distributions.dirichlet import Dirichlet
 from torch.nn.functional import one_hot
 from torch.utils.data.dataset import Dataset
 
-import torchcsprng as csprng
 from gradattack.defenses.defense import GradientDefense
 from gradattack.trainingpipeline import TrainingPipeline
 
@@ -50,12 +50,12 @@ class MixupDefense(GradientDefense):
         self.lambda_sampler_whole = Dirichlet(
             torch.tensor(self.alpha).repeat(self.dataset_size, 1))
         self.use_csprng = use_csprng
-
-        if self.use_csprng:
-            if cs_prng is None:
-                self.cs_prng = csprng.create_random_device_generator()
-            else:
-                self.cs_prng = cs_prng
+        #
+        # if self.use_csprng:
+        #     if cs_prng is None:
+        #         self.cs_prng = csprng.create_random_device_generator()
+        #     else:
+        #         self.cs_prng = cs_prng
 
     # @profile
     def generate_mapping(self, return_tensor=True):
@@ -99,8 +99,7 @@ class MixupDefense(GradientDefense):
             lams = self.lambda_sampler_whole.sample().to(self.device)
             selects = torch.stack([
                 torch.randperm(self.dataset_size,
-                               device=self.device,
-                               generator=self.cs_prng)
+                               device=self.device)
                 for _ in range(self.klam)
             ])
             selects = torch.transpose(selects, 0, 1)
@@ -123,12 +122,7 @@ class MixupDefense(GradientDefense):
             else:
                 return np.asarray(lams), np.asarray(selects)
 
-    def mixup_batch(
-        self,
-        inputs: torch.tensor,
-        lams_b: float,
-        selects_b: np.array,
-    ):
+    def mixup_batch(self, inputs: torch.tensor, lams_b: float, selects_b: np.array):
         """Generate a MixUp batch.
 
         Args:
@@ -139,7 +133,7 @@ class MixupDefense(GradientDefense):
         Returns:
             (torch.tensor): the MixUp images and labels
         """
-        mixed_x = torch.zeros_like(inputs)
+        mixed_x = torch.zeros_like(inputs, device=self.device)
         mixed_y = torch.zeros((len(inputs), self.num_classes),
                               device=self.device)
 
