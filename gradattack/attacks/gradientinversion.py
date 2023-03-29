@@ -1,33 +1,18 @@
 import copy
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 import pytorch_lightning as pl
 import torch
-import torchmetrics
+import torch.nn.functional as F
+from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
+from torchmetrics.functional import peak_signal_noise_ratio
 
 from gradattack.metrics.gradients import CosineSimilarity, L2Diff
 from gradattack.metrics.pixelwise import MeanPixelwiseError
 from gradattack.trainingpipeline import TrainingPipeline
 from gradattack.utils import patch_image
-
-
-# DEFAULT_HPARAMS = {
-#     "optimizer": "Adam",
-#     "lr_scheduler": True,
-#     "lr": 0.1,
-#     "total_variation": 1e-1,
-#     "l2": 0,
-#     "bn_reg": 0,
-#     "first_bn_multiplier": 10,
-#     # If true, will apply image priors on the absolute value of the recovered images
-#     "signed_image": False,
-#     "signed_gradients": True,
-#     "boxed": True,
-#     "attacker_eval_mode": True,
-#     "recipe": 'Geiping'
-# }
 
 
 class BNFeatureHook:
@@ -90,32 +75,30 @@ class DummyGradientDataset(Dataset):
 
 
 class GradientReconstructor(pl.LightningModule):
-    def __init__(
-            self,
-            pipeline: TrainingPipeline,
-            ground_truth_inputs: tuple,
-            ground_truth_gradients: tuple,
-            ground_truth_labels: tuple,
-            intial_reconstruction: torch.tensor = None,
-            reconstruct_labels=False,
-            attack_loss_metric: Callable = CosineSimilarity(),
-            mean_std: tuple = (0.0, 1.0),
-            num_iterations=10000,
-            optimizer: str = "Adam",
-            lr_scheduler: bool = True,
-            lr: float = 0.1,
-            total_variation: float = 1e-1,
-            l2: float = 0,
-            bn_reg: float = 0,
-            first_bn_multiplier: float = 1,
-            signed_image: bool = False,
-            signed_gradients: bool = True,
-            boxed: bool = True,
-            attacker_eval_mode: bool = True,
-            recipe: str = 'Geiping',
-            BN_exact: bool = False,
-            grayscale: bool = False,
-    ):
+    def __init__(self,
+                 pipeline: TrainingPipeline,
+                 ground_truth_inputs: tuple,
+                 ground_truth_gradients: tuple,
+                 ground_truth_labels: tuple,
+                 intial_reconstruction: torch.tensor = None,
+                 reconstruct_labels=False,
+                 attack_loss_metric: Callable = CosineSimilarity(),
+                 mean_std: tuple = (0.0, 1.0),
+                 num_iterations=10000,
+                 optimizer: str = "Adam",
+                 lr_scheduler: bool = True,
+                 lr: float = 0.1,
+                 total_variation: float = 1e-1,
+                 l2: float = 0,
+                 bn_reg: float = 0,
+                 first_bn_multiplier: float = 1,
+                 signed_image: bool = False,
+                 signed_gradients: bool = True,
+                 boxed: bool = True,
+                 attacker_eval_mode: bool = True,
+                 recipe: str = 'Geiping',
+                 BN_exact: bool = False,
+                 grayscale: bool = False):
         super().__init__()
         self.save_hyperparameters("optimizer", "lr_scheduler", "lr",
                                   "total_variation", "l2", "bn_reg",
@@ -177,23 +160,15 @@ class GradientReconstructor(pl.LightningModule):
             class loss_fn(torch.nn.Module):
                 def __call__(self, pred, labels):
                     if len(labels.shape) >= 2:
-                        labels = torch.nn.functional.softmax(labels, dim=-1)
-                        return torch.mean(
-                            torch.sum(
-                                -labels *
-                                torch.nn.functional.log_softmax(pred, dim=-1),
-                                1,
-                            ))
+                        labels = F.softmax(labels, dim=-1)
+                        return torch.mean(torch.sum(-labels * F.log_softmax(pred, dim=-1), 1))
                     else:
-                        return torch.nn.functional.cross_entropy(pred, labels)
+                        return F.cross_entropy(pred, labels)
 
-            self._model._training_loss_metric = None
             self._model._training_loss_metric = loss_fn()
         else:
             self._reconstruct_labels = False
-
         self._batch_transferred = False
-
         self.loss_r_feature_layers = []
 
         for module in self._model.modules():
@@ -272,17 +247,6 @@ class GradientReconstructor(pl.LightningModule):
         return DataLoader(
             DummyGradientDataset(num_values=self.num_iterations, ), )
 
-    def transfer_batch_to_device(self, batch: Any,
-                                 device: Optional[torch.device]) -> Any:
-        if not self._batch_transferred:
-            self.ground_truth_labels = self.ground_truth_labels.detach().to(
-                self.device)
-            self.ground_truth_gradients = tuple(
-                x.detach().to(self.device)
-                for x in self.ground_truth_gradients)
-            self._batch_transferred = True
-        return (self.ground_truth_gradients, self.ground_truth_labels)
-
     def training_step(self, batch, *args):
         input_gradients, labels = batch
 
@@ -302,25 +266,19 @@ class GradientReconstructor(pl.LightningModule):
                 attacker=True,
             )
             if self.recipe == 'Geiping':
-                reconstruction_loss = self._attack_loss_metric(
+                reconst_loss = self._attack_loss_metric(
                     recovered_gradients, input_gradients)
-                reconstruction_loss += self.hparams[
-                                           "total_variation"] * total_variation(
+                reconst_loss += self.hparams["total_variation"] * total_variation(
                     self.best_guess, self.hparams["signed_image"])
-                reconstruction_loss += self.hparams["l2"] * l2_norm(
+                reconst_loss += self.hparams["l2"] * l2_norm(
                     self.best_guess, self.hparams["signed_image"])
             elif self.recipe == 'Zhu':  ## TODO: test
                 self._attack_loss_metric = L2Diff()
-                reconstruction_loss = self._attack_loss_metric(
+                reconst_loss = self._attack_loss_metric(
                     recovered_gradients, input_gradients)
 
-            recon_mean = [
-                mod.mean
-                for (idx, mod) in enumerate(self.loss_r_feature_layers)
-            ]
-            recon_var = [
-                mod.var for (idx, mod) in enumerate(self.loss_r_feature_layers)
-            ]
+            recon_mean = [mod.mean for (idx, mod) in enumerate(self.loss_r_feature_layers)]
+            recon_var = [mod.var for (idx, mod) in enumerate(self.loss_r_feature_layers)]
 
             if self.hparams["bn_reg"] > 0:
                 rescale = [self.hparams["first_bn_multiplier"]] + [
@@ -330,16 +288,14 @@ class GradientReconstructor(pl.LightningModule):
                     mod.r_feature * rescale[idx]
                     for (idx, mod) in enumerate(self.loss_r_feature_layers)
                 ])
-
-                reconstruction_loss += self.hparams["bn_reg"] * loss_r_feature
+                reconst_loss += self.hparams["bn_reg"] * loss_r_feature
 
             self.logger.experiment.add_scalar("Loss",
                                               step_results["loss"],
                                               global_step=self.global_step)
             self.logger.experiment.add_scalar(
-                "Reconstruction Metric Loss",
-                reconstruction_loss,
-                global_step=self.global_step,
+                "Reconstruction Metric Loss", reconst_loss,
+                global_step=self.global_step
             )
 
             if self.global_step % 100 == 0:
@@ -358,13 +314,13 @@ class GradientReconstructor(pl.LightningModule):
                             len(recon_mean[i])),
                         global_step=self.global_step,
                     )
-            self.manual_backward(reconstruction_loss)
+            self.manual_backward(reconst_loss)
             if self.hparams["signed_gradients"]:
                 if self.grayscale:
                     self.best_guess_grayscale.grad.sign_()
                 else:
                     self.best_guess.grad.sign_()
-            return reconstruction_loss
+            return reconst_loss
 
         reconstruction_loss = self.optimizer.step(closure=_closure)
         if self.hparams["lr_scheduler"]:
@@ -398,14 +354,10 @@ class GradientReconstructor(pl.LightningModule):
                         ),
                         global_step=self.global_step,
                     )
-                psnrs = [
-                    torchmetrics.functional.peak_signal_noise_ratio(a, b)
-                    for (a,
-                         b) in zip(self.best_guess, self.ground_truth_inputs)
-                ]
+                psnrs = [peak_signal_noise_ratio(a, b)
+                         for (a, b) in zip(self.best_guess, self.ground_truth_inputs)]
                 avg_psnr = sum(psnrs) / self.num_images
-                self.logger.experiment.add_scalar("Avg. PSNR",
-                                                  avg_psnr,
+                self.logger.experiment.add_scalar("Avg. PSNR", avg_psnr,
                                                   global_step=self.global_step)
 
                 rmses = [
@@ -437,9 +389,8 @@ class GradientReconstructor(pl.LightningModule):
         self.best_guess = self.best_guess.to(self.device)
         self.labels = self.labels.to(self.device)
         if self.grayscale:
-            parameters = ([
-                              self.best_guess_grayscale, self.labels
-                          ] if self._reconstruct_labels else [self.best_guess_grayscale])
+            parameters = ([self.best_guess_grayscale, self.labels
+                           ] if self._reconstruct_labels else [self.best_guess_grayscale])
         else:
             parameters = ([self.best_guess, self.labels]
                           if self._reconstruct_labels else [self.best_guess])
@@ -459,7 +410,7 @@ class GradientReconstructor(pl.LightningModule):
 
     def configure_lr_scheduler(self):
         if self.hparams["lr_scheduler"]:
-            self.lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+            self.lr_scheduler = MultiStepLR(
                 self.optimizer,
                 milestones=[
                     self.num_iterations // 2.667,

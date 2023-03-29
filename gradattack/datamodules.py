@@ -10,8 +10,7 @@ from torch.utils.data import Subset
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
 from torch.utils.data.sampler import Sampler
-from torchvision.datasets import MNIST
-from torchvision.datasets.cifar import CIFAR10, CIFAR100
+from torchvision.datasets import CIFAR10, CIFAR100, MNIST
 
 DEFAULT_DATA_DIR = "./data"
 DEFAULT_NUM_WORKERS = 32

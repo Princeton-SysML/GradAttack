@@ -2,6 +2,7 @@ import os
 from typing import Callable
 
 import pytorch_lightning as pl
+from sklearn import metrics
 from torch.optim.lr_scheduler import LambdaLR, MultiStepLR, ReduceLROnPlateau, StepLR
 
 from gradattack.utils import StandardizeLayer
@@ -50,7 +51,6 @@ class LightningWrapper(pl.LightningModule):
             log_auc: bool = False,
             multi_class: bool = False,
             multi_head: bool = False,
-            log_dir: str = None
     ):
         super().__init__()
         # if we didn't copy here, then we would modify the default dict by accident
@@ -71,8 +71,6 @@ class LightningWrapper(pl.LightningModule):
         self._training_loss_metric = training_loss_metric
         self._val_loss_metric = training_loss_metric
 
-        self._optimizer = optimizer
-
         self._batch_transformations = []
         self._grad_transformations = []
         self._opt_transformations = []
@@ -90,7 +88,6 @@ class LightningWrapper(pl.LightningModule):
         self.log_auc = log_auc
         self.multi_class = multi_class
         self.multi_head = multi_head
-        self.log_dir = log_dir
 
     def forward(self, x):
         if self.multi_head:
@@ -101,14 +98,17 @@ class LightningWrapper(pl.LightningModule):
         else:
             return self._model(x)
 
-    def _transform_batch(self, batch, batch_idx, *args):
-        for transform in self._batch_transformations:
-            batch = transform(batch, batch_idx, *args)
-        return batch
+    def should_accumulate(self):
+        return self.trainer.train_loop.should_accumulate()
 
     def on_train_epoch_start(self) -> None:
         for callback in self._on_train_epoch_start_callbacks:
             callback(self)
+
+    def _transform_batch(self, batch, batch_idx, *args):
+        for transform in self._batch_transformations:
+            batch = transform(batch, batch_idx, *args)
+        return batch
 
     def _transform_gradients(self):
         for transform in self._grad_transformations:
@@ -122,7 +122,6 @@ class LightningWrapper(pl.LightningModule):
         Args:
             batch : The batch inputs. Should be a torch tensor with outermost dimension 2, where dimension 0 corresponds to inputs and dimension 1
             corresponds to labels.
-
         Returns:
             dict: The results from the training step. Is a dictionary with keys "loss", "transformed_batch", and "model_outputs".
         """
@@ -164,14 +163,81 @@ class LightningWrapper(pl.LightningModule):
         #     self.on_non_accumulate_step()
         self.on_non_accumulate_step()
 
-        top1_acc = accuracy(
-            training_step_results["model_outputs"],
-            training_step_results["transformed_batch"][1],
-            multi_head=self.multi_head,
-        )[0]
-        self.log("train/acc", top1_acc, on_epoch=True, logger=True)
+        if self.log_train_acc:
+            top1_acc = accuracy(
+                training_step_results["model_outputs"],
+                training_step_results["transformed_batch"][1],
+                multi_head=self.multi_head,
+            )[0]
+            self.log(
+                "step/train_acc",
+                top1_acc,
+                on_step=True,
+                on_epoch=False,
+                prog_bar=True,
+                logger=True,
+            )
 
         return training_step_results
+
+    def get_batch_gradients(self,
+                            batch: torch.tensor,
+                            batch_idx: int = 0,
+                            create_graph: bool = False,
+                            clone_gradients: bool = True,
+                            apply_transforms=True,
+                            eval_mode: bool = False,
+                            stop_track_bn_stats: bool = True,
+                            BN_exact: bool = False,
+                            attacker: bool = False,
+                            *args):
+        batch = tuple(k.to(self.device) for k in batch)
+        if eval_mode is True:
+            self.eval()
+        else:
+            self.train()
+
+        if BN_exact:
+            for module in self._model.modules():
+                if isinstance(module, torch.nn.BatchNorm2d):
+                    if not attacker:
+                        module.reset_running_stats()  # reset BN statistics
+                        module.momentum = (
+                            1  # save current BN statistics as running statistics
+                        )
+                    if attacker:
+                        self.training = False  # set BN module to eval mode
+                        module.momentum = 0  # stop tracking BN statistics
+                        if hasattr(module, "weight"):
+                            module.weight.requires_grad_(True)
+                        if hasattr(module, "bias"):
+                            module.bias.requires_grad_(True)
+
+        if stop_track_bn_stats:
+            for module in self._model.modules():
+                if isinstance(module, torch.nn.BatchNorm2d):
+                    module.momentum = 0  # Stop tracking running mean and std any more
+
+        self.zero_grad()
+        training_step_results = self._compute_training_step(
+            batch, batch_idx, apply_batch_transforms=apply_transforms, *args)
+
+        # Make sure to apply transformations to gradients
+        if apply_transforms:
+            training_step_results["loss"].backward()
+            self._transform_gradients()
+            # Clone to prevent the gradients from being changed by training
+            batch_gradients = tuple(
+                p.grad.clone() if clone_gradients is True else p.grad
+                for p in self.parameters())
+        else:
+            batch_gradients = torch.autograd.grad(
+                training_step_results["loss"],
+                self._model.parameters(),
+                create_graph=create_graph,
+            )
+
+        return batch_gradients, training_step_results
 
     def on_non_accumulate_step(self) -> None:
         # This hook runs only after accumulation
@@ -180,9 +246,14 @@ class LightningWrapper(pl.LightningModule):
         if self._log_gradients:
             grad_norm_dict = self.grad_norm(1)
             for k, v in grad_norm_dict.items():
-                self.log(f"gradients/{k}", v,
-                         on_epoch=True,
-                         logger=True)
+                self.log(
+                    f"gradients/{k}",
+                    v,
+                    on_step=True,
+                    on_epoch=True,
+                    prog_bar=False,
+                    logger=True,
+                )
 
         self.optimizer.step()
         self.optimizer.zero_grad()
@@ -193,10 +264,14 @@ class LightningWrapper(pl.LightningModule):
                 self.trainer.should_stop = True
 
         self.step_tracker.end()
-        self.log("train/loss",
-                 self.step_tracker.cur_loss,
-                 on_epoch=True,
-                 logger=True)
+        self.log(
+            "step/train_loss",
+            self.step_tracker.cur_loss,
+            on_step=True,
+            on_epoch=False,
+            prog_bar=True,
+            logger=True,
+        )
 
     def configure_optimizers(self):
         if self.hparams["optimizer"] == "Adam":
@@ -264,15 +339,54 @@ class LightningWrapper(pl.LightningModule):
         else:
             loss = self._val_loss_metric(y_hat, y)
         top1_acc = accuracy(y_hat, y, multi_head=self.multi_head)[0]
-
-        self.log('val/loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val/acc', top1_acc, on_epoch=True, prog_bar=True, logger=True)
+        if self.log_auc:
+            pred_list, true_list = auc_list(y_hat, y)
+        else:
+            pred_list, true_list = None, None
+        return {
+            "batch/val_loss": loss,
+            "batch/val_accuracy": top1_acc,
+            "batch/val_pred_list": pred_list,
+            "batch/val_true_list": true_list,
+        }
 
     def validation_epoch_end(self, outputs):
-        path = self.log_dir + '/last.ckpt'
-        if os.path.exists(self.log_dir + '/last.ckpt'):
-            os.remove(self.log_dir + '/last.ckpt')
-        self.trainer.save_checkpoint(self.log_dir + '/last.ckpt')
+        # outputs is whatever returned in `validation_step`
+        avg_loss = torch.stack([x["batch/val_loss"] for x in outputs]).mean()
+        avg_accuracy = torch.stack([x["batch/val_accuracy"]
+                                    for x in outputs]).mean()
+        if self.log_auc:
+            self.log_aucs(outputs, stage="val")
+
+        self.current_val_loss = avg_loss
+        if self.current_epoch > 0:
+            if self.hparams["lr_scheduler"] == "ReduceLROnPlateau":
+                self.lr_scheduler.step(self.current_val_loss)
+            else:
+                self.lr_scheduler.step()
+
+        self.cur_lr = self.optimizer.param_groups[0]["lr"]
+
+        self.log(
+            "epoch/val_accuracy",
+            avg_accuracy,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
+        self.log("epoch/val_loss",
+                 avg_loss,
+                 on_epoch=True,
+                 prog_bar=True,
+                 logger=True)
+        self.log("epoch/lr",
+                 self.cur_lr,
+                 on_epoch=True,
+                 prog_bar=True,
+                 logger=True)
+
+        for callback in self._epoch_end_callbacks:
+            callback(self)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -296,14 +410,63 @@ class LightningWrapper(pl.LightningModule):
             "batch/test_true_list": true_list,
         }
 
+    def test_epoch_end(self, outputs):
+        avg_loss = torch.stack([x["batch/test_loss"] for x in outputs]).mean()
+        avg_accuracy = torch.stack([x["batch/test_accuracy"]
+                                    for x in outputs]).mean()
+        if self.log_auc:
+            self.log_aucs(outputs, stage="test")
 
-def create_lightning_module(model_name: str,
-                            num_classes: int,
-                            pretrained: bool = False,
-                            ckpt: str = None,
-                            freeze_extractor: bool = False,
-                            *args,
-                            **kwargs) -> LightningWrapper:
+        self.log("run/test_accuracy",
+                 avg_accuracy,
+                 on_epoch=True,
+                 prog_bar=True,
+                 logger=True)
+        self.log("run/test_loss",
+                 avg_loss,
+                 on_epoch=True,
+                 prog_bar=True,
+                 logger=True)
+
+    def log_aucs(self, outputs, stage="test"):
+        pred_list = np.concatenate(
+            [x[f"batch/{stage}_pred_list"] for x in outputs])
+        true_list = np.concatenate(
+            [x[f"batch/{stage}_true_list"] for x in outputs])
+
+        aucs = []
+        for c in range(len(pred_list[0])):
+            fpr, tpr, thresholds = metrics.roc_curve(true_list[:, c],
+                                                     pred_list[:, c],
+                                                     pos_label=1)
+            auc_val = metrics.auc(fpr, tpr)
+            aucs.append(auc_val)
+
+            self.log(
+                f"epoch/{stage}_auc/class_{c}",
+                auc_val,
+                on_epoch=True,
+                prog_bar=False,
+                logger=True,
+            )
+        self.log(
+            f"epoch/{stage}_auc/avg",
+            np.mean(aucs),
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
+
+
+def create_lightning_module(
+        model_name: str,
+        num_classes: int,
+        pretrained: bool = False,
+        ckpt: str = None,
+        freeze_extractor: bool = False,
+        *args,
+        **kwargs,
+) -> LightningWrapper:
     if "models" in model_name:  # Official models by PyTorch
         model_name = model_name.replace("models.", "")
         if pretrained is False:

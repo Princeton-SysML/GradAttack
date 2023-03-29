@@ -4,8 +4,7 @@ from gradattack.models import LightningWrapper
 
 
 class TrainingPipeline:
-    def __init__(self,
-                 model: LightningWrapper,
+    def __init__(self, model: LightningWrapper,
                  datamodule: pl.LightningDataModule,
                  trainer: pl.Trainer):
         self.model = model

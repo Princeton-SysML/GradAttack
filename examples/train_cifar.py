@@ -35,7 +35,7 @@ if __name__ == "__main__":
     early_stop_callback = EarlyStopping(
         monitor="val/loss_epoch",
         min_delta=0.00,
-        patience=20,
+        patience=50,
         verbose=False,
         mode="min",
     )

@@ -24,32 +24,19 @@ def parse_args():
                         default="ResNet34",
                         type=str,
                         help="name of model")
-    parser.add_argument("--data",
-                        default="CIFAR10",
-                        type=str,
-                        help="name of dataset")
-    parser.add_argument(
-        "--results_dir",
-        default="./results",
-        type=str,
-        help="directory to save attack results",
-    )
-    parser.add_argument("--n_epoch",
-                        default=200,
-                        type=int,
-                        help="number of epochs")
-    parser.add_argument("--batch_size",
-                        default=128,
-                        type=int,
+    parser.add_argument("--data", default="CIFAR10",
+                        type=str, help="name of dataset")
+    parser.add_argument("--results_dir", default="./results",
+                        type=str, help="directory to save attack results")
+    parser.add_argument("--n_epoch", default=200, type=int, help="number of epochs")
+    parser.add_argument("--batch_size", default=512, type=int,
                         help="batch size")
     parser.add_argument("--optimizer",
                         default="SGD",
                         type=str,
                         help="which optimizer")
     parser.add_argument("--lr", default=0.4, type=float, help="initial lr")
-    parser.add_argument("--decay",
-                        default=5e-4,
-                        type=float,
+    parser.add_argument("--decay", default=5e-4, type=float,
                         help="weight decay")
     parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument("--nesterov", action="store_true")
@@ -57,9 +44,7 @@ def parse_args():
                         default="ReduceLROnPlateau",
                         type=str,
                         help="which scheduler")
-    parser.add_argument("--lr_step",
-                        default=30,
-                        type=int,
+    parser.add_argument("--lr_step", default=30, type=int,
                         help="reduce LR per ? epochs")
     parser.add_argument("--lr_lambda",
                         default=0.95,
@@ -76,49 +61,33 @@ def parse_args():
                         default=10,
                         type=int,
                         help="patience for early stopping")
-    parser.add_argument(
-        "--tune_on_val",
-        default=0.02,
-        type=float,
-        help=
-        "fraction of validation data. If set to 0, use test data as the val data",
-    )
+    parser.add_argument("--tune_on_val",
+                        default=0.02,
+                        type=float,
+                        help="fraction of validation data. If set to 0, use test data as the val data", )
     parser.add_argument("--log_auc", dest="log_auc", action="store_true")
-    parser.add_argument("--logname",
-                        default="vanilla",
-                        type=str,
-                        help="log name")
+    parser.add_argument("--logname", default="vanilla", type=str, help="log name")
     parser.add_argument("--pretrained", dest="pretrained", action="store_true")
-    parser.add_argument("--ckpt",
-                        default=None,
-                        type=str,
-                        help="directory for ckpt")
-    parser.add_argument(
-        "--freeze_extractor",
-        dest="freeze_extractor",
-        action="store_true",
-        help="Whether only training the fc layer",
-    )
+    parser.add_argument("--ckpt", default=None, type=str, help="directory for ckpt")
+    parser.add_argument("--freeze_extractor",
+                        dest="freeze_extractor",
+                        action="store_true",
+                        help="Whether only training the fc layer", )
 
     # Augmentation
-    parser.add_argument(
-        "--dis_aug_crop",
-        dest="aug_crop",
-        action="store_false",
-        help="Whether to apply random cropping",
-    )
-    parser.add_argument(
-        "--dis_aug_hflip",
-        dest="aug_hflip",
-        action="store_false",
-        help="Whether to apply horizontally flipping",
-    )
-    parser.add_argument(
-        "--aug_affine",
-        dest="aug_affine",
-        action="store_true",
-        help="Enable random affine",
-    )
+    parser.add_argument("--dis_aug_crop",
+                        dest="aug_crop",
+                        action="store_false",
+                        help="Whether to apply random cropping")
+    parser.add_argument("--dis_aug_hflip",
+                        dest="aug_hflip",
+                        action="store_false",
+                        help="Whether to apply horizontally flipping")
+    parser.add_argument("--aug_affine",
+                        dest="aug_affine",
+                        action="store_true",
+                        help="Enable random affine",
+                        )
     parser.add_argument(
         "--aug_rotation",
         type=float,
@@ -136,17 +105,11 @@ def parse_args():
     parser.add_argument("--defense_instahide",
                         dest="defense_instahide",
                         action="store_true")
-    parser.add_argument("--klam",
-                        default=4,
-                        type=int,
+    parser.add_argument("--klam", default=4, type=int,
                         help="How many images to mix with")
-    parser.add_argument("--c_1",
-                        default=0,
-                        type=float,
+    parser.add_argument("--c_1", efault=0, type=float,
                         help="Lower bound of mixing coefs")
-    parser.add_argument("--c_2",
-                        default=1,
-                        type=float,
+    parser.add_argument("--c_2", default=1, type=float,
                         help="Upper bound of mixing coefs")
     parser.add_argument("--use_csprng", dest="use_csprng", action="store_true")
     # GradPrune
@@ -165,34 +128,20 @@ def parse_args():
         type=float,
         help="Failure prob of DP",
     )
-    parser.add_argument("--max_epsilon",
-                        default=2,
-                        type=float,
+    parser.add_argument("--max_epsilon", default=2, type=float,
                         help="Privacy budget")
-    parser.add_argument(
-        "--max_grad_norm",
-        default=1,
-        type=float,
-        help="Clip per-sample gradients to this norm",
-    )
+    parser.add_argument("--max_grad_norm", default=1, type=float,
+                        help="Clip per-sample gradients to this norm", )
     parser.add_argument("--noise_multiplier",
                         default=1,
                         type=float,
                         help="Noise multiplier")
-
-    parser.add_argument(
-        "--n_accumulation_steps",
-        default=1,
-        type=int,
-        help="Run optimization per ? step",
-    )
-    parser.add_argument(
-        "--secure_rng",
-        dest="secure_rng",
-        action="store_true",
-        help=
-        "Enable Secure RNG to have trustworthy privacy guarantees. Comes at a performance cost",
-    )
+    parser.add_argument("--n_accumulation_steps", default=1, type=int,
+                        help="Run optimization per ? step")
+    parser.add_argument("--secure_rng",
+                        dest="secure_rng",
+                        action="store_true",
+                        help="Enable Secure RNG to have trustworthy privacy guarantees. Comes at a performance cost", )
 
     # For attack
     parser.add_argument("--reconstruct_labels", action="store_true")
@@ -211,31 +160,18 @@ def parse_args():
                         default=None,
                         type=int,
                         help="seed to select attack subset")
-    parser.add_argument("--attack_epoch",
-                        default=0,
-                        type=int,
+    parser.add_argument("--attack_epoch", default=0, type=int,
                         help="iterations for the attack")
-    parser.add_argument(
-        "--bn_reg",
-        default=0,
-        type=float,
-        help="coef. for batchnorm regularization term",
-    )
-    parser.add_argument(
-        "--attacker_eval_mode",
-        action="store_true",
-        help="use eval model for gradients calculation for attack",
-    )
-    parser.add_argument(
-        "--defender_eval_mode",
-        action="store_true",
-        help="use eval model for gradients calculation for training",
-    )
-    parser.add_argument(
-        "--BN_exact",
-        action="store_true",
-        help="use training batch's mean and var",
-    )
+    parser.add_argument("--bn_reg", default=0, type=float,
+                        help="coef. for batchnorm regularization term")
+    parser.add_argument("--attacker_eval_mode",
+                        action="store_true",
+                        help="use eval model for gradients calculation for attack")
+    parser.add_argument("--defender_eval_mode", action="store_true",
+                        help="use eval model for gradients calculation for training")
+    parser.add_argument("--BN_exact",
+                        action="store_true",
+                        help="use training batch's mean and var",)
 
     args = parser.parse_args()
 
@@ -254,7 +190,7 @@ def parse_args():
         hparams["lr_step"] = args.lr_step
         hparams["lr_factor"] = args.lr_factor
     elif args.scheduler == "MultiStepLR":
-        hparams["lr_step"] = [5, 60, 120, 160]
+        hparams["lr_step"] = [60, 120, 160]
         hparams["lr_factor"] = args.lr_factor
     elif args.scheduler == "LambdaLR":
         hparams["lr_lambda"] = args.lr_lambda
@@ -285,16 +221,12 @@ def parse_args():
 
 def parse_augmentation(args):
     return {
-        "hflip":
-            args.aug_hflip,
-        "crop":
-            args.aug_crop,
-        "rotation":
-            args.aug_rotation,
+        "hflip": args.aug_hflip,
+        "crop": args.aug_crop,
+        "rotation": args.aug_rotation,
         "color_jitter": [float(i) for i in args.aug_colorjitter]
         if args.aug_colorjitter is not None else None,
-        "affine":
-            args.aug_affine,
+        "affine": args.aug_affine,
     }
 
 
