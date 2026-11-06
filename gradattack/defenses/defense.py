@@ -1,4 +1,7 @@
-from gradattack.trainingpipeline import TrainingPipeline
+try:
+    from gradattack.trainingpipeline import TrainingPipeline
+except (ImportError, ModuleNotFoundError):
+    TrainingPipeline = object
 
 
 class GradientDefense:
