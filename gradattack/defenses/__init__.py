@@ -1,6 +1,23 @@
 from .defense import *
-from .defense_utils import *
-from .dpsgd import *
+from .gradquant import *
 from .gradprune import *
-from .mixup import *
-from .instahide import *
+
+try:
+    from .defense_utils import *
+except (ImportError, ModuleNotFoundError):
+    pass
+
+try:
+    from .dpsgd import *
+except (ImportError, ModuleNotFoundError):
+    pass
+
+try:
+    from .mixup import *
+except (ImportError, ModuleNotFoundError):
+    pass
+
+try:
+    from .instahide import *
+except (ImportError, ModuleNotFoundError):
+    pass

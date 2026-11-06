@@ -4,7 +4,10 @@ import torch
 from colorama import Back, Fore, Style, init
 from torch.utils.data.dataset import Dataset
 
-from gradattack.trainingpipeline import TrainingPipeline
+try:
+    from gradattack.trainingpipeline import TrainingPipeline
+except (ImportError, ModuleNotFoundError):
+    TrainingPipeline = object
 
 from .dpsgd import DPSGDDefense
 from .gradprune import GradPruneDefense
